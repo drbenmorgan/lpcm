@@ -21,12 +21,12 @@ And then install:
     python setup.py install
 
 For typical usage of this library look at the documentation in 
-<<docs>> or at the unit tests found in <<tests>>.
+... or at the unit tests found in ....
 
 Support
 -------
 
-Please feel free to use [issue tracking](https://github.com/warwick-epp/issues) on Github to to submit feature requests or bug reports. Please send merge requests on [Github](http://github.com/warwick-epp/lpcm).
+Please feel free to use [issue tracking](https://github.com/epp-warwick/lpcm/issues) on Github to to submit feature requests or bug reports. Please send merge requests on [Github](http://github.com/epp-warwick).
 
 References
 ----------
