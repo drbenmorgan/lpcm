@@ -31,7 +31,7 @@ Please feel free to use [issue tracking](https://github.com/epp-warwick/lpcm/iss
 References
 ----------
 
-We ask that forked projects retain the reference below and propagate this request. Please also use this reference when using the code for academic use.
+We ask that forked projects retain the reference below and propagate this request. Please also use this reference when using the code for academic purposes.
 
 Einbeck, J., Tutz, G., & Evers, L. (2005), Local principal curves, Statistics and Computing 15, 301-313.
 

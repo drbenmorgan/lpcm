@@ -3,7 +3,7 @@ Created on 10 Oct 2011
 
 @author: droythorne
 '''
-from droythorne.lpcm.lpc import LPCImpl
+from lpcm.lpc import LPCImpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 from numpy.core.numeric import array, arange

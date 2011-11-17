@@ -3,6 +3,7 @@ Created on 6 Oct 2011
 
 @author: droythorne
 ''' 
+from lpcm.lpcStartPoints import lpcRandomStartPoints
 from math import sqrt
 from numpy.core.fromnumeric import prod, transpose
 from numpy.core.numeric import array, ones, empty, zeros, dot
@@ -11,9 +12,10 @@ from numpy.lib.function_base import average
 from numpy.lib.shape_base import vsplit
 from numpy.linalg.linalg import eig, eigh
 from numpy.ma.core import mean, mod, ravel, where, copy, sqrt
-from numpy.random import random_integers
+
 from scipy.spatial.distance import cdist
 from scipy.stats.distributions import norm as gauss
+from scitools.Lumpy import iscallable
 from scitools.PrmDictBase import PrmDictBase
 import numpy
 
@@ -35,19 +37,18 @@ class LPCImpl(PrmDictBase):
     if scaled: 
       self.Xi = self.Xi / s1
     else:
-      h = self._lpcParameters['h']
-      self.set_in_dict('h', h * s1, self._lpcParameters)
+      h = self._lpcParameters['h'] #TODO, check, is there something missing here?
   
-  def _selectStartPoints(self):
+  def _selectStartPoints(self, x0):
     '''
-    Selects mult points (defaults to 10 unless specified in constructor) selected uniformally (with replacement) from the input points, Xi
-    Is dependent upon scaling of self.Xi being performed before start points are generated
+    Delegates to _selectStartPoints the task of generating a number, mult, seed points for multiple passes of the algorithm 
     '''
     mult = self._lpcParameters['mult']
-    if mult is None:
-      mult = 10
+    #None allowed since NULL was a permitted value in original R code, a little clumsy though
+    
     self.set_in_dict('mult', mult, self._lpcParameters)
-    self.x0 = self.Xi[random_integers(0, self.Xi.shape[0] - 1, mult),:]
+    
+    self.x0 = self._selectStartPoints(x0, mult)
   
   def _kern(self, y, x = 0, h = 1):
     return gauss.pdf((y-x)/h) / h
@@ -87,9 +88,9 @@ class LPCImpl(PrmDictBase):
                                   phi = phi,
                                   last_eigenvector = last_eigenvector,
                                   weights = weights)
-      #Append forward_curve to the end of the reversed back_curve with initial point of back curve removed
+      #Stitching - append forward_curve to the end of the reversed back_curve with initial point of back curve removed
       #TODO - neaten this up, looks pretty clumsy
-      combined_distance = hstack((-back_curve['lamb'][:0:-1], forward_curve['lamb'])) #mend discontinuity in path length
+      combined_distance = hstack((-back_curve['lamb'][:0:-1], forward_curve['lamb'])) 
       curve = {'start_point': x,
                'start_point_index': len(back_curve['save_xd']) - 1,
                'save_xd': vstack((back_curve['save_xd'][:0:-1], forward_curve['save_xd'])),
@@ -169,7 +170,6 @@ class LPCImpl(PrmDictBase):
       else:
         cos_neu_neu[i] = cos_alt_neu[i]
       
-      #TODO implement angle penalisation
       pen = self._lpcParameters['pen']
       if pen > 0:
         if i == 0 and last_eigenvector is not None:
@@ -187,7 +187,7 @@ class LPCImpl(PrmDictBase):
         if forward_curve is None:
           full_curve_points = save_xd[0:i+1]
         else:
-          full_curve_points = vstack((forward_curve['save_xd'],save_xd[0:i+1])) #probably very inefficient 
+          full_curve_points = vstack((forward_curve['save_xd'],save_xd[0:i+1])) #inefficient, initialize then append? 
         
         if not cross:
           prox = where(ravel(cdist(full_curve_points,[mu_x])) <= mean(h))[0]
@@ -221,11 +221,16 @@ class LPCImpl(PrmDictBase):
             }
     return curve  
 
-  def __init__(self, **params):
+  def __init__(self, start_points_generator = lpcRandomStartPoints(), **params):
     '''
     TODO document each parameter within dict and copy warnings/errors (possible?)
     '''
     super(LPCImpl, self).__init__()
+    
+   
+    if not iscallable(self._startPointsGenerator):
+      raise TypeError, 'Start points generator must be callable'
+    
     self._lpcParameters = { 'h': 0.1, 
                             't0': 0.1,
                             'way': 'two',
@@ -236,13 +241,12 @@ class LPCImpl(PrmDictBase):
                             'cross': True,
                             'boundary': 0.005,
                             'convergence_at': 0.00001,
-                            'mult': None,
-                            'ms_h': None,
-                            'ms_sub': 30,
+                            'mult': 10, #set this to None to allow exactly the number of local density modes to be returned from MeanShift  
                             'pruning_thresh': 0.0,
                             'rho0': 0.4,
                             'gapsize': 1.5  
                           }
+    
     self._prm_list = [self._lpcParameters] 
     self.user_prm = None #extension of parameter set disallowed
     self._type_check.update({ 'h': lambda x: LPCImpl._positivityCheck(x) or (isinstance(x, list) and all(map(LPCImpl._positivityCheck, x)) ) , 
@@ -256,8 +260,6 @@ class LPCImpl(PrmDictBase):
                               'convergence_at': LPCImpl._positivityCheck,
                               'boundary':  lambda x: LPCImpl._positivityCheck(x), #TODO - no assertion boundary > convergence.at (add to _update)
                               'mult': lambda x: (x == None) or (isinstance(x, int) and x > 0),
-                              'ms_h': lambda x: LPCImpl._positivityCheck(x) or (lambda x: x == None or (isinstance(x, list) and all(map(LPCImpl._positivityCheck, x)))),
-                              'ms_sub': lambda x: x > 0 and x < 100,
                               'pruning_thresh': LPCImpl._positivityCheck,
                               'rho0': LPCImpl._positivityCheck,
                               'gapsize': LPCImpl._positivityCheck
@@ -265,25 +267,31 @@ class LPCImpl(PrmDictBase):
     self.set(**params)
     self.Xi = None
     self.x0 = None
+    self._startPointsGenerator = start_points_generator(self.Xi)
     
-  def lpc(self, X, h = None, t0 = None, weights = None):
-    
-    self.Xi = array(X, dtype = float)
-    if self.Xi.ndim != 2:
-      raise ValueError, 'X must be 2 dimensional'
-    N = self.Xi.shape[0]
-    d = self.Xi.shape[1] 
-    if d==1:
-      raise ValueError, 'Data set must be at least two-dimensional'
-    
-    if h is None:
-      h = self._lpcParameters['h']
-    else:
-      self.set_in_dict('h', h, self._lpcParameters)
+  def resetScaleParameters(self, h, t0 = None):
+    self.set_in_dict('h', h, self._lpcParameters)
     if t0 is None:
       t0 = mean(h)  
     self.set_in_dict('t0', t0, self._lpcParameters)
+  
+  def setDataPoints(self, X):
     
+    if X.ndim != 2:
+      raise ValueError, 'X must be 2 dimensional'
+    d = X.shape[1] 
+    if d==1:
+      raise ValueError, 'Data set must be at least two-dimensional'
+    self.Xi = array(X, dtype = float)
+  
+  def lpc(self, x0=None, X=None, weights = None):
+    if X is None:
+      if self.Xi is None:
+        raise ValueError, 'Data points have not yet been set in this LPCImpl instance. Either supply as X parameter to this function or call setDataPoints'
+    else:
+      self.setDataPoints(X)
+        
+    N = self.Xi.shape[0]
     if weights is None:
       w = ones(N, dtype = float)
     else:
@@ -291,12 +299,8 @@ class LPCImpl(PrmDictBase):
       if w.shape != (N):
         raise ValueError, 'Weights must be one dimensional of vector of weights with size equal to the sample size'
     
-    self._rescaleInput()
-    
-    if(self._lpcParameters['ms_h'] is None):
-      self.set_in_dict('ms_h', h, self._lpcParameters)
-    
-    self._selectStartPoints()
+    self._rescaleInput() #NOTE, scaling should take place prior to start points being generated
+    self._selectStartPoints(x0)
         
     #TODO add initialization relevant for other branches
     m = self.x0.shape[0] #how many starting points were actually generated

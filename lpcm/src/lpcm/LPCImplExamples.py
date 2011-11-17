@@ -1,10 +1,11 @@
+
 '''
 Created on 28 Oct 2011
 
 @author: droythorne
 '''
-from droythorne.lpcm.lpc import LPCImpl
-from droythorne.lpcm.lpcDiagnostics import LPCResiduals
+from lpcm.lpc import LPCImpl
+from lpcm.lpcDiagnostics import LPCResiduals
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.mlab import griddata
 from mpl_toolkits.mplot3d import axes3d, Axes3D
@@ -23,7 +24,7 @@ def plot1():
   y = map(lambda x: x + gauss(0,0.005), arange(-1,1,0.005))
   z = map(lambda x: x + gauss(0,0.005), arange(-1,1,0.005))
   line = array(zip(x,y,z))
-  lpc = LPCImpl(h = 0.2, convergence_at = 0.001, mult = 2)
+  lpc = LPCImpl(h = 0.05, mult = 2, scaled = False)
   lpc_curve = lpc.lpc(line)
   ax = Axes3D(fig1)
   ax.set_title('testNoisyLine1')
@@ -31,17 +32,37 @@ def plot1():
   ax.scatter(curve[:,0],curve[:,1],curve[:,2],c = 'red')
   return fig1
 def plot2():
-  fig2 = plt.figure()
-  x = map(lambda x: x + gauss(0,0.002), arange(-1,1,0.001))
-  y = map(lambda x: x + gauss(0,0.002), arange(-1,1,0.001))
-  z = map(lambda x: x + gauss(0,0.02), arange(-1,1,0.001))
+  fig5 = plt.figure()
+  x = map(lambda x: x + gauss(0,0.02)*(1-x*x), arange(-1,1,0.001))
+  y = map(lambda x: x + gauss(0,0.02)*(1-x*x), arange(-1,1,0.001))
+  z = map(lambda x: x + gauss(0,0.02)*(1-x*x), arange(-1,1,0.001))
   line = array(zip(x,y,z))
-  lpc = LPCImpl(h = 0.2, mult = 2)
+  lpc = LPCImpl(h = 0.05, mult = 2, it = 200, cross = False, scaled = False, convergence_at = 0.001)
   lpc_curve = lpc.lpc(line)
-  ax = Axes3D(fig2)
+  ax = Axes3D(fig5)
   ax.set_title('testNoisyLine2')
   curve = lpc_curve[0]['save_xd']
-  ax.scatter(curve[:,0],curve[:,1],curve[:,2])
+  ax.scatter(x,y,z, c = 'red')
+  ax.plot(curve[:,0],curve[:,1],curve[:,2])
+  saveToPdf(fig5, '/tmp/testNoisyLine2.pdf')
+  residuals_calc = LPCResiduals(line, tube_radius = 0.05, k = 10)
+  residual_diags = residuals_calc.getPathResidualDiags(lpc_curve[0])
+  fig6 = plt.figure()
+  #plt.plot(lpc_curve[0]['lamb'][1:], residual_diags['line_seg_num_NN'], drawstyle = 'step', linestyle = '--')
+  plt.plot(lpc_curve[0]['lamb'][1:], residual_diags['line_seg_mean_NN'])
+  plt.plot(lpc_curve[0]['lamb'][1:], residual_diags['line_seg_std_NN'])
+  saveToPdf(fig6, '/tmp/testNoisyLine2PathResiduals.pdf')
+  coverage_graph = residuals_calc.getCoverageGraph(lpc_curve[0], arange(0.001, .102, 0.005))
+  fig7 = plt.figure()
+  plt.plot(coverage_graph[0],coverage_graph[1])
+  saveToPdf(fig7, '/tmp/testNoisyLine2Coverage.pdf')
+  residual_graph = residuals_calc.getGlobalResiduals(lpc_curve[0])
+  fig8 = plt.figure()
+  plt.plot(residual_graph[0], residual_graph[1])
+  saveToPdf(fig8, '/tmp/testNoisyLine2Residuals.pdf')
+  fig9 = plt.figure()
+  plt.plot(range(len(lpc_curve[0]['lamb'])), lpc_curve[0]['lamb'])
+  saveToPdf(fig9, '/tmp/testNoisyLine2PathLength.pdf')
 def helixNonRandom():
   #Parameterise a helix (no noise)
   fig3 = plt.figure()
@@ -123,16 +144,21 @@ def helixHeteroscedasticDiags():
   plt.plot(lpc_curve[0]['lamb'][1:], residual_diags['line_seg_mean_NN'])
   plt.plot(lpc_curve[0]['lamb'][1:], residual_diags['line_seg_std_NN'])
   saveToPdf(fig6, '/tmp/helixHeteroscedasticPathResiduals.pdf')
-  #coverage_graph = residuals_calc.getCoverageGraph(lpc_curve[0], arange(0.01, .252, 0.05))
-  #fig7 = plt.figure()
-  #plt.plot(coverage_graph[0],coverage_graph[1])
-  #saveToPdf(fig7, '/tmp/helixHeteroscedasticCoverage.pdf')
+  coverage_graph = residuals_calc.getCoverageGraph(lpc_curve[0], arange(0.01, .052, 0.01))
+  fig7 = plt.figure()
+  plt.plot(coverage_graph[0],coverage_graph[1])
+  saveToPdf(fig7, '/tmp/helixHeteroscedasticCoverage.pdf')
   residual_graph = residuals_calc.getGlobalResiduals(lpc_curve[0])
   fig8 = plt.figure()
   plt.plot(residual_graph[0], residual_graph[1])
   saveToPdf(fig8, '/tmp/helixHeteroscedasticResiduals.pdf')
   fig9 = plt.figure()
   plt.plot(range(len(lpc_curve[0]['lamb'])), lpc_curve[0]['lamb'])
+  saveToPdf(fig9, '/tmp/helixHeteroscedasticPathLength.pdf')
+
+def lamuMuonTest():
+  pass
+
 def saveToPdf(fig, filename):
   pp = PdfPages(filename)
   pp.savefig(fig)
@@ -141,9 +167,9 @@ def saveToPdf(fig, filename):
 if __name__ == '__main__':
     
     #fig1 = plot1()
-    #fig2 = plot2()
+    fig2 = plot2()
     #fig3 = helixNonRandom()
     #fig4 = helixRandom()
-    fig5 = helixHeteroscedasticDiags()
+    #fig5 = helixHeteroscedasticDiags()
     
     plt.show()
