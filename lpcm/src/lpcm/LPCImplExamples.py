@@ -6,16 +6,17 @@ Created on 28 Oct 2011
 '''
 from lpcm.lpc import LPCImpl
 from lpcm.lpcDiagnostics import LPCResiduals
+from lpcm.lpcStartPoints import lpcMeanShift
 from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.mlab import griddata
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 from numpy.core.function_base import linspace
 from numpy.core.numeric import array, arange
+from numpy.core.shape_base import vstack
+from numpy.lib.function_base import unique
 from numpy.ma.core import sin, cos, zeros
 from random import gauss
 from scipy.constants.constants import pi
-from scipy.interpolate.fitpack2 import UnivariateSpline
-from scipy.interpolate.rbf import Rbf
+from itertools import cycle
 import matplotlib.pyplot as plt
 
 def plot1():
@@ -25,7 +26,7 @@ def plot1():
   z = map(lambda x: x + gauss(0,0.005), arange(-1,1,0.005))
   line = array(zip(x,y,z))
   lpc = LPCImpl(h = 0.05, mult = 2, scaled = False)
-  lpc_curve = lpc.lpc(line)
+  lpc_curve = lpc.lpc(X=line)
   ax = Axes3D(fig1)
   ax.set_title('testNoisyLine1')
   curve = lpc_curve[0]['save_xd']
@@ -38,7 +39,7 @@ def plot2():
   z = map(lambda x: x + gauss(0,0.02)*(1-x*x), arange(-1,1,0.001))
   line = array(zip(x,y,z))
   lpc = LPCImpl(h = 0.05, mult = 2, it = 200, cross = False, scaled = False, convergence_at = 0.001)
-  lpc_curve = lpc.lpc(line)
+  lpc_curve = lpc.lpc(X=line)
   ax = Axes3D(fig5)
   ax.set_title('testNoisyLine2')
   curve = lpc_curve[0]['save_xd']
@@ -71,8 +72,8 @@ def helixNonRandom():
   y = (1 - t*t)*cos(4*pi*t)
   z = t
   line = array(zip(x,y,z))
-  lpc = LPCImpl(h = 0.15, t0 = 0.2, mult = 2, it = 500, scaled = False)
-  lpc_curve = lpc.lpc(line)
+  lpc = LPCImpl(h = 0.15, t0 = 0.2, mult = 2, it = 100, scaled = False)
+  lpc_curve = lpc.lpc(X=line)
   ax = Axes3D(fig3)
   ax.set_title('helixNonRandom')
   curve = lpc_curve[0]['save_xd']
@@ -87,8 +88,8 @@ def helixRandom():
   y = map(lambda x: x + gauss(0,0.01), (1 - t*t)*cos(4*pi*t))
   z = map(lambda x: x + gauss(0,0.01), t)
   line = array(zip(x,y,z))
-  lpc = LPCImpl(h = 0.15, t0 = 0.2, mult = 2, it = 500, scaled = False)
-  lpc_curve = lpc.lpc(line)
+  lpc = LPCImpl(h = 0.15, t0 = 0.2, mult = 2, it = 100, scaled = False)
+  lpc_curve = lpc.lpc(X=line)
   ax = Axes3D(fig4)
   ax.set_title('helixRandom')
   curve = lpc_curve[0]['save_xd']
@@ -113,14 +114,40 @@ def helixHeteroscedasticCrossingDemo():
   saveToPdf(fig5, '/tmp/helixHeteroscedasticWithCrossing.pdf')
   lpc.set_in_dict('cross', False, '_lpcParameters')
   fig6 = plt.figure()
-  lpc_curve = lpc.lpc(line)
+  lpc_curve = lpc.lpc(X=line)
   ax = Axes3D(fig6)
   ax.set_title('helixHeteroscedasticWithoutCrossing')
   curve = lpc_curve[0]['save_xd']
   ax.scatter(x,y,z, c = 'red')
   ax.plot(curve[:,0],curve[:,1],curve[:,2])
   saveToPdf(fig6, '/tmp/helixHeteroscedasticWithoutCrossing.pdf')
-  
+def twoDisjointLinesWithMSClustering():
+ 
+  t = arange(-1,1,0.002)
+  x = map(lambda x: x + gauss(0,0.02)*(1-x*x), t)
+  y = map(lambda x: x + gauss(0,0.02)*(1-x*x), t)
+  z = map(lambda x: x + gauss(0,0.02)*(1-x*x), t)
+  line1 = array(zip(x,y,z))
+  line = vstack((line1, line1 + 3))
+  lpc = LPCImpl(start_points_generator = lpcMeanShift(ms_h = 1), h = 0.05, mult = None, it = 200, cross = False, scaled = False, convergence_at = 0.001)
+  lpc_curve = lpc.lpc(X=line)
+  #Plot results
+  fig = plt.figure()
+  ax = Axes3D(fig)
+  labels = lpc._startPointsGenerator._meanShift.labels_
+  labels_unique = unique(labels)
+  cluster_centers = lpc._startPointsGenerator._meanShift.cluster_centers_
+  n_clusters = len(labels_unique)
+  colors = cycle('bgrcmyk')
+  for k, col in zip(range(n_clusters), colors):
+    cluster_members = labels == k
+    cluster_center = cluster_centers[k]
+    ax.scatter(line[cluster_members, 0], line[cluster_members, 1], line[cluster_members, 2], c = col, alpha = 0.1)
+    ax.scatter([cluster_center[0]], [cluster_center[1]], [cluster_center[2]], c = 'b', marker= '^')
+    curve = lpc_curve[k]['save_xd']
+    ax.plot(curve[:,0],curve[:,1],curve[:,2], c = col, linewidth = 3)
+  plt.show()
+  print 'Done and dusted'
 def helixHeteroscedasticDiags():
   #Parameterise a helix (no noise)
   fig5 = plt.figure()
@@ -130,7 +157,7 @@ def helixHeteroscedasticDiags():
   z = map(lambda x: x + gauss(0,0.001 + 0.001*sin(2*pi*x)**2), t)
   line = array(zip(x,y,z))
   lpc = LPCImpl(h = 0.1, t0 = 0.1, mult = 1, it = 500, scaled = False, cross = False)
-  lpc_curve = lpc.lpc(line)
+  lpc_curve = lpc.lpc(X=line)
   ax = Axes3D(fig5)
   ax.set_title('helixHeteroscedastic')
   curve = lpc_curve[0]['save_xd']
@@ -167,9 +194,9 @@ def saveToPdf(fig, filename):
 if __name__ == '__main__':
     
     #fig1 = plot1()
-    fig2 = plot2()
+    #fig2 = plot2()
     #fig3 = helixNonRandom()
     #fig4 = helixRandom()
     #fig5 = helixHeteroscedasticDiags()
-    
-    plt.show()
+    fig6 = twoDisjointLinesWithMSClustering()
+    #plt.show()

@@ -44,11 +44,10 @@ class LPCImpl(PrmDictBase):
     Delegates to _selectStartPoints the task of generating a number, mult, seed points for multiple passes of the algorithm 
     '''
     mult = self._lpcParameters['mult']
-    #None allowed since NULL was a permitted value in original R code, a little clumsy though
     
     self.set_in_dict('mult', mult, self._lpcParameters)
     
-    self.x0 = self._selectStartPoints(x0, mult)
+    self.x0 = self._startPointsGenerator(self.Xi, n = mult, x0 = x0)
   
   def _kern(self, y, x = 0, h = 1):
     return gauss.pdf((y-x)/h) / h
@@ -224,12 +223,9 @@ class LPCImpl(PrmDictBase):
   def __init__(self, start_points_generator = lpcRandomStartPoints(), **params):
     '''
     TODO document each parameter within dict and copy warnings/errors (possible?)
+    
     '''
     super(LPCImpl, self).__init__()
-    
-   
-    if not iscallable(self._startPointsGenerator):
-      raise TypeError, 'Start points generator must be callable'
     
     self._lpcParameters = { 'h': 0.1, 
                             't0': 0.1,
@@ -267,7 +263,10 @@ class LPCImpl(PrmDictBase):
     self.set(**params)
     self.Xi = None
     self.x0 = None
-    self._startPointsGenerator = start_points_generator(self.Xi)
+    #start_points_generator = lpcRandomStartPoints(),
+    if not iscallable(start_points_generator):
+      raise TypeError, 'Start points generator must be callable'
+    self._startPointsGenerator = start_points_generator
     
   def resetScaleParameters(self, h, t0 = None):
     self.set_in_dict('h', h, self._lpcParameters)
@@ -284,7 +283,7 @@ class LPCImpl(PrmDictBase):
       raise ValueError, 'Data set must be at least two-dimensional'
     self.Xi = array(X, dtype = float)
   
-  def lpc(self, x0=None, X=None, weights = None):
+  def lpc(self, x0 = None, X=None, weights = None):
     if X is None:
       if self.Xi is None:
         raise ValueError, 'Data points have not yet been set in this LPCImpl instance. Either supply as X parameter to this function or call setDataPoints'
