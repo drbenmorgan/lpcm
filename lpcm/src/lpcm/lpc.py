@@ -3,6 +3,7 @@ Created on 6 Oct 2011
 
 @author: droythorne
 ''' 
+from copy import deepcopy
 from lpcm.lpcStartPoints import lpcRandomStartPoints
 from math import sqrt
 from numpy.core.fromnumeric import prod, transpose
@@ -12,12 +13,12 @@ from numpy.lib.function_base import average
 from numpy.lib.shape_base import vsplit
 from numpy.linalg.linalg import eig, eigh
 from numpy.ma.core import mean, mod, ravel, where, copy, sqrt
-
 from scipy.spatial.distance import cdist
 from scipy.stats.distributions import norm as gauss
 from scitools.Lumpy import iscallable
 from scitools.PrmDictBase import PrmDictBase
 import numpy
+
 
 class Direction:
   FORWARD = 1
@@ -33,12 +34,22 @@ class LPCImpl(PrmDictBase):
   
   def _rescaleInput(self):
     scaled = self._lpcParameters['scaled']
-    s1 = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
+    h = self._lpcParameters['h']
+    
     if scaled: 
-      self.Xi = self.Xi / s1
+      self._dataRange = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
+      self.Xi = self.Xi / self._dataRange
+      if h is None:
+        h = 0.1
+        self.resetScaleParameters(h, self._lpcParameters['t0'])  
     else:
-      h = self._lpcParameters['h'] #TODO, check, is there something missing here?
-  
+      if h is None:
+        self._dataRange = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
+        h = list(0.1 * self._dataRange)
+        self.resetScaleParameters(h, self._lpcParameters['t0'])
+    #make sure that t0 is set 
+    if self._lpcParameters['t0'] is None:
+      self._lpcParameters['t0'] = mean(h)
   def _selectStartPoints(self, x0):
     '''
     Delegates to _selectStartPoints the task of generating a number, mult, seed points for multiple passes of the algorithm 
@@ -99,12 +110,23 @@ class LPCImpl(PrmDictBase):
                'high_rho_points': vstack((back_curve['high_rho_points'], forward_curve['high_rho_points'])),
                'lamb': combined_distance - min(combined_distance),
                'c0': hstack((back_curve['c0'][:0:-1], forward_curve['c0'])),
-               }
-              
+               }      
       return curve
     else:
       raise ValueError, 'way must be one of one/back/two'
-    
+  def _calculatePathLength(self, save_xd):
+    '''Calculates the cumulative Euclidian d-dimensional path length of the piecewise linear curve defined by a series of points save_xd
+       Returns an array with n entries, where n is the number of points defining the curve. First point has distance 0.
+    ''' 
+    it = len(save_xd)
+    lamb = empty(it)
+    for i in range(it):
+      if i==0:
+        lamb[0] = 0
+      else:
+        lamb[i] = lamb[i-1] + sqrt(sum((save_xd[i] - save_xd[i-1])**2))
+    return lamb
+  
   def _followxSingleDirection(  self, 
                                 x, 
                                 direction = Direction.FORWARD,
@@ -150,7 +172,7 @@ class LPCImpl(PrmDictBase):
       #Calculate eigenvalues/vectors
       #(sorted_eigen_cov is a list of tuples containing eigenvalue and associated eigenvector, sorted descending by eigenvalue)
       eigen_cov = eigh(cov_x)
-      sorted_eigen_cov = zip(eigen_cov[0],map(ravel,vsplit(eigen_cov[1].transpose(),3)))
+      sorted_eigen_cov = zip(eigen_cov[0],map(ravel,vsplit(eigen_cov[1].transpose(),len(eigen_cov[1]))))
       sorted_eigen_cov.sort(key = lambda elt: elt[0], reverse = True)   
       eigen_norm = sqrt(sum(sorted_eigen_cov[0][1]**2))
       eigen_vecd[i] = direction * sorted_eigen_cov[0][1] / eigen_norm  #Unit eigenvector corresponding to largest eigenvalue
@@ -227,8 +249,8 @@ class LPCImpl(PrmDictBase):
     '''
     super(LPCImpl, self).__init__()
     
-    self._lpcParameters = { 'h': 0.1, 
-                            't0': 0.1,
+    self._lpcParameters = { 'h': None, 
+                            't0': None,
                             'way': 'two',
                             'scaled': True,
                             'pen': 2,
@@ -237,7 +259,7 @@ class LPCImpl(PrmDictBase):
                             'cross': True,
                             'boundary': 0.005,
                             'convergence_at': 0.00001,
-                            'mult': 10, #set this to None to allow exactly the number of local density modes to be returned from MeanShift  
+                            'mult': 1, #set this to None to allow exactly the number of local density modes to be returned from MeanShift  
                             'pruning_thresh': 0.0,
                             'rho0': 0.4,
                             'gapsize': 1.5  
@@ -245,8 +267,8 @@ class LPCImpl(PrmDictBase):
     
     self._prm_list = [self._lpcParameters] 
     self.user_prm = None #extension of parameter set disallowed
-    self._type_check.update({ 'h': lambda x: LPCImpl._positivityCheck(x) or (isinstance(x, list) and all(map(LPCImpl._positivityCheck, x)) ) , 
-                              't0': LPCImpl._positivityCheck,
+    self._type_check.update({ 'h': lambda x: (x == None) or LPCImpl._positivityCheck(x) or (isinstance(x, list) and all(map(LPCImpl._positivityCheck, x)) ) , 
+                              't0': lambda x: (x == None) or LPCImpl._positivityCheck,
                               'way': lambda x: x in ('one', 'two', 'back'),
                               'scaled': (bool,),
                               'pen': LPCImpl._positivityCheck,
@@ -261,19 +283,43 @@ class LPCImpl(PrmDictBase):
                               'gapsize': LPCImpl._positivityCheck
                             })
     self.set(**params)
+    
     self.Xi = None
     self.x0 = None
-    #start_points_generator = lpcRandomStartPoints(),
+    self._dataRange = None
+    self._curve = None
+   
     if not iscallable(start_points_generator):
       raise TypeError, 'Start points generator must be callable'
     self._startPointsGenerator = start_points_generator
     
+    
+    self._startPointsGenerator.setScaleParameters(self._lpcParameters['h'])
+    
+    
+  def getCurve(self, unscale = False):
+    '''Returns a deep copy of self._curve, unless if unscale = True and self._lpcParameters['scaled'] = True, then a deep copy of self._curve is 
+       returned, with save_xd, start_point and high_rho_points multiplied through by range parameters, self._dataRange. lamb is then recalculated on the unscaled data#
+       All other elements of the lpc are unchanged
+    '''
+    curve = deepcopy(self._curve)
+    
+    if unscale == True and self._lpcParameters['scaled'] == True:
+      for c in curve:
+        c['start_point'] = c['start_point'] * self._dataRange
+        c['save_xd'] = c['save_xd'] * self._dataRange
+        c['high_rho_points'] = c['save_xd'] * self._dataRange
+        c['lamb'] = self._calculatePathLength(c['save_xd'])
+    
+    return curve
+    
   def resetScaleParameters(self, h, t0 = None):
     self.set_in_dict('h', h, self._lpcParameters)
+    self._startPointsGenerator.setScaleParameters(self._lpcParameters['h'])
     if t0 is None:
       t0 = mean(h)  
     self.set_in_dict('t0', t0, self._lpcParameters)
-  
+    
   def setDataPoints(self, X):
     
     if X.ndim != 2:
@@ -282,8 +328,11 @@ class LPCImpl(PrmDictBase):
     if d==1:
       raise ValueError, 'Data set must be at least two-dimensional'
     self.Xi = array(X, dtype = float)
-  
+    self._rescaleInput() #NOTE, scaling should take place prior to start points being generated
+    print 'breakpoint'
   def lpc(self, x0 = None, X=None, weights = None):
+    ''' Will return the scaled curve if self._lpcParameters['scaled'] = True, to return the curve on the same scale as the originally input data, call getCurve with unscale = True
+    '''
     if X is None:
       if self.Xi is None:
         raise ValueError, 'Data points have not yet been set in this LPCImpl instance. Either supply as X parameter to this function or call setDataPoints'
@@ -298,13 +347,13 @@ class LPCImpl(PrmDictBase):
       if w.shape != (N):
         raise ValueError, 'Weights must be one dimensional of vector of weights with size equal to the sample size'
     
-    self._rescaleInput() #NOTE, scaling should take place prior to start points being generated
+    
     self._selectStartPoints(x0)
         
     #TODO add initialization relevant for other branches
     m = self.x0.shape[0] #how many starting points were actually generated
     way = self._lpcParameters['way']
-    curve = [self._followx(self.x0[j], way = way, weights = w) for j in range(m)]
-    return curve
+    self._curve = [self._followx(self.x0[j], way = way, weights = w) for j in range(m)]
+    return self._curve
       
       
