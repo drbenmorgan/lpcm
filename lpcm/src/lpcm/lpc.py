@@ -196,7 +196,7 @@ class LPCImpl(PrmDictBase):
         if i == 0 and last_eigenvector is not None:
           a = abs(cos_alt_neu[i])**pen
           eigen_vecd[i] = a * eigen_vecd[i] + (1-a) * last_eigenvector
-        if i > 0 and last_eigenvector is not None:
+        if i > 0:
           a = abs(cos_alt_neu[i])**pen
           eigen_vecd[i] = a * eigen_vecd[i] + (1-a) * eigen_vecd[i-1]
               
@@ -258,7 +258,7 @@ class LPCImpl(PrmDictBase):
                             'it': 100,
                             'cross': True,
                             'boundary': 0.005,
-                            'convergence_at': 0.00001,
+                            'convergence_at': 1e-6,
                             'mult': 1, #set this to None to allow exactly the number of local density modes to be returned from MeanShift  
                             'pruning_thresh': 0.0,
                             'rho0': 0.4,
@@ -271,7 +271,7 @@ class LPCImpl(PrmDictBase):
                               't0': lambda x: (x == None) or LPCImpl._positivityCheck,
                               'way': lambda x: x in ('one', 'two', 'back'),
                               'scaled': (bool,),
-                              'pen': LPCImpl._positivityCheck,
+                              'pen': lambda x: (x == 0) or LPCImpl._positivityCheck,
                               'depth': lambda x: x in (1,2,3),
                               'it': lambda x: isinstance(x, int) and x > 9,
                               'cross': (bool,),
@@ -292,9 +292,7 @@ class LPCImpl(PrmDictBase):
     if not iscallable(start_points_generator):
       raise TypeError, 'Start points generator must be callable'
     self._startPointsGenerator = start_points_generator
-    
-    
-    self._startPointsGenerator.setScaleParameters(self._lpcParameters['h'])
+    #self._startPointsGenerator.setScaleParameters(self._lpcParameters['h'])
     
     
   def getCurve(self, unscale = False):

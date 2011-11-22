@@ -69,7 +69,6 @@ class lpcMeanShift(PrmDictBase):
                               'ms_sub': lambda x: lpcMeanShift._positivityCheck and x < 100
                            })
     self.set(**params)
-    self.setScaleParameters()
    
     '''
     Generates n seed points for the lpc algorithm. 

@@ -34,7 +34,7 @@ def calSpeedFlow():
   
 def gaia():
   gaia = array(readData('../../resources/gaia.dat'))
-  lpc = LPCImpl(start_points_generator = lpcMeanShift(ms_h = 0.1), mult = 1, scaled = False)
+  lpc = LPCImpl(start_points_generator = lpcMeanShift(), mult = 1, scaled = False)
   curve = lpc.lpc(X = gaia)
   fig = plt.figure()
   ax = Axes3D(fig)
