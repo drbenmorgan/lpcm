@@ -197,6 +197,6 @@ if __name__ == '__main__':
     #fig2 = plot2()
     #fig3 = helixNonRandom()
     #fig4 = helixRandom()
-    #fig5 = helixHeteroscedasticDiags()
+    fig5 = helixHeteroscedasticDiags()
     fig6 = twoDisjointLinesWithMSClustering()
     #plt.show()

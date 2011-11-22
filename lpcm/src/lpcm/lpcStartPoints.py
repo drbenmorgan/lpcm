@@ -69,7 +69,7 @@ class lpcMeanShift(PrmDictBase):
                               'ms_sub': lambda x: lpcMeanShift._positivityCheck and x < 100
                            })
     self.set(**params)
-   
+    self._meanShift = MeanShift()
     '''
     Generates n seed points for the lpc algorithm. 
     X, 2 dimensional [#points, #dimension of points] array containing the data for which local density modes is to calculated

@@ -45,6 +45,6 @@ def gaia():
   
 if __name__ == '__main__':
   calSpeedFlow()
-  gaia()
+  #gaia()
   plt.show()
   
