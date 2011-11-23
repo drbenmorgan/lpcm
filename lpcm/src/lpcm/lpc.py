@@ -160,7 +160,7 @@ class LPCImpl(PrmDictBase):
       sum_weights = sum(kernel_weights)
       mean_sub = self.Xi - mu_x 
       cov_x = dot( dot(transpose(mean_sub), numpy.diag(kernel_weights)), mean_sub) / sum_weights 
-      assert (abs(cov_x.transpose() - cov_x)/abs(cov_x.transpose() + cov_x) < 1e-6).all(), 'Covariance matrix not symmetric, \n cov_x = {0}, mean_sub = {1}'.format(cov_x, mean_sub)
+     # assert (abs(cov_x.transpose() - cov_x)/abs(cov_x.transpose() + cov_x) < 1e-6).all(), 'Covariance matrix not symmetric, \n cov_x = {0}, mean_sub = {1}'.format(cov_x, mean_sub)
       save_xd[i] = mu_x #save first point of the branch
       count_points += 1
       #Calculate path length
@@ -259,7 +259,7 @@ class LPCImpl(PrmDictBase):
                             'cross': True,
                             'boundary': 0.005,
                             'convergence_at': 1e-6,
-                            'mult': 1, #set this to None to allow exactly the number of local density modes to be returned from MeanShift  
+                            'mult': None, #set this to None to allow exactly the number of local density modes to be returned from MeanShift  
                             'pruning_thresh': 0.0,
                             'rho0': 0.4,
                             'gapsize': 1.5  

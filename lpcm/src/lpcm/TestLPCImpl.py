@@ -15,6 +15,7 @@ import unittest
 class TestLPCImpl(unittest.TestCase):
 
   def setUp(self):
+    print 'Setup'
     pass
   
   def testParamInit_h(self):
@@ -56,3 +57,5 @@ class TestLPCImpl(unittest.TestCase):
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()
+
+    

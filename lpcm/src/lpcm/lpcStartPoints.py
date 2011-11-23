@@ -69,7 +69,10 @@ class lpcMeanShift(PrmDictBase):
                               'ms_sub': lambda x: lpcMeanShift._positivityCheck and x < 100
                            })
     self.set(**params)
-    self._meanShift = MeanShift()
+    if self._lpcParameters['ms_h'] is None:
+      self._meanShift = MeanShift()
+    else:
+      self._meanShift = MeanShift(bandwidth = mean(self._lpcParameters['ms_h']))
     '''
     Generates n seed points for the lpc algorithm. 
     X, 2 dimensional [#points, #dimension of points] array containing the data for which local density modes is to calculated
@@ -102,11 +105,12 @@ class lpcMeanShift(PrmDictBase):
   
   def setScaleParameters(self, ms_h = None):
     '''This is for initially setting the scale parameters, and only has an effect if self._lpcParamters['ms_h'] is None
-       If ms_h is None, self._lpcParamters['ms_h'] is set to the default value of 0.1
+       If ms_h is None, self._lpcParamters['ms_h'] remains as none, and the bandwidth is determined by the ms algorithm
     '''
     if self._lpcParameters['ms_h'] is None:
       if ms_h is None:
-        self.set_in_dict('ms_h', 0.1, self._lpcParameters)
+        pass
+        #self.set_in_dict('ms_h', 0.1, self._lpcParameters)
       else:
         self.set_in_dict('ms_h', ms_h, self._lpcParameters)  
     

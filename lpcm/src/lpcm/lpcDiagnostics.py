@@ -6,9 +6,64 @@ Created on 28 Oct 2011
 from numpy import isinf, invert, mean, std
 from numpy.core.numeric import cross, dot, array
 from numpy.core.shape_base import vstack, hstack
-from numpy.ma.core import empty, zeros, sqrt, argsort
+from numpy.ma.core import empty, zeros, sqrt, argsort, ones
 from scipy.spatial.kdtree import KDTree
 from scitools.PrmDictBase import PrmDictBase
+
+class LPCResidualsRunner():
+  '''
+  Generates curve diagnostics from an instance of LPCResiduals and an instance of LPCImpl These include pathResidualDiags,
+  TubeResiduals and CoverageIndices for each curve, plus the matrix with element (n,m) equal to the proportion of coverage indices
+  in cylinder m contained in cylinder n (i.e. the degree of overlap in the hits associated to each path, used later to prune the result set
+  by removing or concatenating curves 
+  '''
+  def __init__(self, lpc_algorithm, lpc_residuals):
+    self._lpcAlgorithm = lpc_algorithm
+    self._lpcResiduals = lpc_residuals
+    self._tauRange = None
+  def setTauRange(self,tau_range):
+    '''
+    tau_range, 1d list of floats , each defining the radius of the cylinder around lpc curves used to associate self._lpcAlgorithm.Xi points to curves
+    '''   
+    self._tauRange = tau_range
+  def calculateResiduals(self):
+    if self._tauRange is None:
+      raise ValueError, 'tauRange, the list of cylinder radii, has not yet been defined'
+    curves = self._lpcAlgorithm.getCurve()
+    curve_residuals = []
+    for curve in curves:
+        tube_residuals = self._lpcResiduals.getTubeResiduals(curve)
+        path_residuals =  self._lpcResiduals.getPathResidualDiags(curve)
+        coverage_indices = {}
+        for tau in self._tauRange:
+          indices = self._lpcResiduals.calculateCoverageIndices(curve, tau)
+          coverage_indices[tau] = indices
+        curve_residuals.append({'tube_residuals': tube_residuals, 'path_residuals': path_residuals, 'coverage_indices': coverage_indices})
+    
+    containment_matrices = {}
+    for tau in self._tauRange:
+      containment_matrix = self._calculateHitContainmentMatrix(curve_residuals, tau)
+      containment_matrices[tau] = containment_matrix
+    
+    residuals = {'curve_residuals': curve_residuals, 'containment_matrices': containment_matrices}
+    return residuals    
+      
+  def _calculateHitContainmentMatrix(self, curve_residuals, tau):
+    '''
+    Calculates a 2d array where the (i,j)th entry is the proportion of elements in curve_residuals[i]['coverage_indices'][tau] that are also contained
+    in curve_residuals[j]['coverage_indices'][tau]
+    ''' 
+    num_curves = len(curve_residuals)
+    containment_matrix = ones((num_curves, num_curves))
+    for i in range(num_curves):
+      labels_i = curve_residuals[i]['coverage_indices'][tau]
+      for j in range(i+1, num_curves):  
+        labels_j = curve_residuals[j]['coverage_indices'][tau]
+        cardinality_intersect = len(labels_i & labels_j)
+        containment_matrix[i, j] = float(cardinality_intersect)/len(labels_i)
+        containment_matrix[j, i] = float(cardinality_intersect)/len(labels_j)
+    return containment_matrix
+    
 class LPCResiduals(PrmDictBase):
   '''
   classdocs
@@ -28,8 +83,11 @@ class LPCResiduals(PrmDictBase):
     ball_radius = self._calculateBallRadius(curve, ball_radius)
     eps = self._params['eps']
     return self._treeX.query_ball_point(curve['save_xd'], ball_radius, 2.0, eps)
-  '''Returns tuple of minimum distance to the directed line segment AB from p, and the distance along AB of the point of intersection'''  
+  
   def _distancePointToLineSegment(self, a, b, p):
+    '''
+    Returns tuple of minimum distance to the directed line segment AB from p, and the distance along AB of the point of intersection
+    '''  
     ab_mag2 = dot((b-a),(b-a))
     pa_mag2 = dot((a-p),(a-p))
     pb_mag2 = dot((b-p),(b-p))
@@ -47,13 +105,15 @@ class LPCResiduals(PrmDictBase):
       return (dist_to_line, dist_along_segment)
   def _calculateMaxSegmentLength(self, curve):
     return max([curve['lamb'][i+1] - curve['lamb'][i] for i in range(len(curve['lamb']) - 1)])      
+  def setDataPoints(self, X):
+    if len(X) == 0:
+      raise ValueError, 'There must be at least 1 data point'
+    self._X = X
+    self._treeX = KDTree(X)
   def __init__(self, X, **params):
     '''
     Constructor
     '''
-    self._treeX = KDTree(X)
-    self._X = X #trat as read only
-    self._maxSegmentLength = None
     super(LPCResiduals, self).__init__()
     self._params = {  'k': 20, 
                       'tube_radius': 0.2,
@@ -66,41 +126,68 @@ class LPCResiduals(PrmDictBase):
                               'eps': lambda x: isinstance(x, (int,float)) and x > 0
                             })
     self.set(**params)
+    self.setDataPoints(X)
+    self._maxSegmentLength = None
   
-  '''Calculates the indices of self._X that contain points within tau of the curve defined by lpc_points'''
-  def _calculateCoverageIndices(self, curve, tau):
-    indices = self._calculateNNBallIndices(curve, self._calculateBallRadius(curve, tau))
-    lpc_points = curve['save_xd']
-    num_lpc_pts = len(lpc_points)
+  def calculateCoverageIndices(self, curves, tau):  
+    '''
+    Calculates the indices of self._X that contain points within tau of the curve defined by lpc_points.
+    curves, either a single lpc curve dictionary or a list of lpc curve dictionaries
+    '''
+    if type(curves) == dict:
+      curves = [curves]
+      
     points_in_tube = set()
     
-    for i in range(num_lpc_pts - 1):
-      trial_indices = list(set(indices[i:i+2].ravel()[0]))
-      trial_points = self._X[trial_indices] 
-      local_points_in_tube = []
-      for j, p in enumerate(trial_points):
-        d = self._distancePointToLineSegment(lpc_points[i], lpc_points[i+1], p)[0]
-        if d < tau:
-          local_points_in_tube.append(trial_indices[j])
-      points_in_tube = points_in_tube | set(local_points_in_tube)  
+    for curve in curves:    
+      indices = self._calculateNNBallIndices(curve, self._calculateBallRadius(curve, tau))
+      lpc_points = curve['save_xd']
+      num_lpc_pts = len(lpc_points)
+            
+      for i in range(num_lpc_pts - 1):
+        trial_indices = list(set(indices[i:i+2].ravel()[0]))
+        trial_points = self._X[trial_indices] 
+        local_points_in_tube = []
+        for j, p in enumerate(trial_points):
+          d = self._distancePointToLineSegment(lpc_points[i], lpc_points[i+1], p)[0]
+          if d < tau:
+            local_points_in_tube.append(trial_indices[j])
+        points_in_tube = points_in_tube | set(local_points_in_tube)  
     return points_in_tube
-  '''Return a 2*(len(lpc_points) - 1) array of the proportion of self._X points within tau (in tau_range, an array)'''
-  '''of the curve segments, where 'curve' is a element (dictionary) of curve returned by LPCImpl.lpc''' 
-  def getCoverageGraph(self, curve, tau_range):
-    coverage = [1.0*len(self._calculateCoverageIndices(curve,tau))/len(self._X) for tau in tau_range]
+ 
+  def getCoverageGraph(self, curves, tau_range):
+    '''Return a 2*len(tau_range) array of the proportion of self._X points within tau (in tau_range, an array)
+    of the curve segments, where 'curves' is a either a list of curve dictionaries as returned by LPCImpl.lpc, or an element thereof
+    This should give graphs similar to the output of BOakley
+    '''
+    coverage = [1.0*len(self.calculateCoverageIndices(curves,tau))/len(self._X) for tau in tau_range]
     return array([tau_range,coverage])
-  '''This should give graphs similar to the output of BOakley'''
+  
+  def getTubeResiduals(self, curve):
+    return self._calculatePointResiduals(curve, self._params['tube_radius'])
+  
   def getGlobalResiduals(self, curve):
+    '''
+    '''
+    return self._calculatePointResiduals(curve)
+  
+  def _calculatePointResiduals(self, curve, tube_radius = None):
+    if tube_radius is None:
+      X = self._X
+    else:
+      within_tube_indices = self.calculateCoverageIndices(curve, tube_radius)
+      X = self._X.take(list(within_tube_indices), axis = 0) 
+      
     if self._maxSegmentLength is None:
       self._maxSegmentLength = self._calculateMaxSegmentLength(curve)
     lpc_points = curve['save_xd']
     num_lpc_points = len(lpc_points)
     tree_lpc_points = KDTree(lpc_points)
-    residuals = empty(len(self._X))
-    residuals_lamb = empty(len(self._X))
+    residuals = empty(len(X))
+    residuals_lamb = empty(len(X))
     path_length = curve['lamb']
     
-    for j, p in enumerate(self._X): 
+    for j, p in enumerate(X): 
       closest_lpc_point = tree_lpc_points.query(p)
       candidate_radius = sqrt(closest_lpc_point[0]**2 + 0.25*self._maxSegmentLength**2)
       candidate_segment_ends = tree_lpc_points.query_ball_point(p, candidate_radius)
