@@ -10,15 +10,52 @@ If you'd like to download and install the latest source you'll need git:
 
     git clone git://github.com/warwick-epp/lpcm.git
 
-TODO
-Run the test suite to make sure things are in order with the 
-distribution:
+lpcm is known to run using Python 2.6.5 and Python 2.7.1+.
 
-    python test.py
+The following instructions apply to installation of lpcm on the Warwick CSC machines,
+though these steps should provide all dependencies for an otherwise bare python install. 
+                          
+0) baseDir is the location of the base directory location where all downloaded
+python code packages will be installed. 
 
-And then install:
+1) Download lpcm from github, installed using
 
-    python setup.py install
+    cd baseDir/lpcm/src
+    rm -r build  (if this already exists)
+    python setup.py install --prefix=${PWD}/build
+
+    setenv PYTHONPATH ${PWD}/build/lib/python2.6/site-packages
+
+2) Download setuptools-0.6c11 from http://pypi.python.org/pypi/setuptools
+
+    cd baseDir
+    tar zxvf setuptools-0.6c11.tar.gz
+    cd setuptools-0.6c11
+    mkdir build
+    python setup.py install --root=${PWD}/build
+
+    setenv PYTHONPATH ${PYTHONPATH}:${PWD}
+
+3) Download scikit-learn-0.9 from http://scikit-learn.org/stable
+    
+    cd baseDir
+    tar zxvf scikit-learn-0.9.tar.gz
+    cd scikit-learn-0.9
+    mkdir build
+    python setup.py install --root=${PWD}/build
+
+    setenv PYTHONPATH ${PYTHONPATH}:${PWD}/build/lib.linux-x86_64-2.6
+
+4) Download scitools-0.8 from http://code.google.com/p/scitools
+    
+    cd baseDir
+    tar zxvf scitools-0.8.tar.gz
+    cd scitools-0.8
+    mkdir build
+    python setup.py install --prefix=${PWD}/build
+    
+    setenv PYTHONPATH ${PYTHONPATH}:${PWD}/lib
+    
 
 For typical usage of this library look at the documentation in 
 ... or at the unit tests found in ....
