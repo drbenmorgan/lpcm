@@ -1,7 +1,8 @@
 Description
 -----------
 
-lpcm is a python library for fitting multivariate data patterns with local principal curves (lpc); including simple tools for measuring goodness-of-fit.      
+lpcm is a python library for fitting multivariate data patterns with local principal curves (lpc); including simple tools for measuring goodness-of-fit, 
+track-cluster splitting/merging/pruning, and output serialisation      
 
 Installation
 ------------
@@ -12,7 +13,7 @@ If you'd like to download and install the latest source you'll need git:
 
 lpcm is known to run using Python 2.6.5 and Python 2.7.1+.
 
-The following instructions apply to installation of lpcm on the Warwick CSC machines,
+The following instructions apply to installation of lpcm on the Warwick CSC (http://www2.warwick.ac.uk/fac/sci/csc/) machines,
 though these steps should provide all dependencies for an otherwise bare python install. 
                           
 0) baseDir is the location of the base directory location where all downloaded
@@ -56,7 +57,7 @@ python code packages will be installed.
     
     setenv PYTHONPATH ${PYTHONPATH}:${PWD}/lib
     
-
+Some examples also require the presence of the latte package (http://latte_reference.com). This is currently only available to Warwick EPP users.
 For typical usage of this library look at the documentation in 
 ... or at the unit tests found in ....
 

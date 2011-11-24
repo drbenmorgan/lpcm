@@ -32,24 +32,7 @@ class LPCImpl(PrmDictBase):
   def _positivityCheck(x):
     return isinstance(x, (int, float)) and x > 0
   
-  def _rescaleInput(self):
-    scaled = self._lpcParameters['scaled']
-    h = self._lpcParameters['h']
-    
-    if scaled: 
-      self._dataRange = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
-      self.Xi = self.Xi / self._dataRange
-      if h is None:
-        h = 0.1
-        self.resetScaleParameters(h, self._lpcParameters['t0'])  
-    else:
-      if h is None:
-        self._dataRange = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
-        h = list(0.1 * self._dataRange)
-        self.resetScaleParameters(h, self._lpcParameters['t0'])
-    #make sure that t0 is set 
-    if self._lpcParameters['t0'] is None:
-      self._lpcParameters['t0'] = mean(h)
+ 
   def _selectStartPoints(self, x0):
     '''
     Delegates to _selectStartPoints the task of generating a number, mult, seed points for multiple passes of the algorithm 
@@ -317,7 +300,25 @@ class LPCImpl(PrmDictBase):
     if t0 is None:
       t0 = mean(h)  
     self.set_in_dict('t0', t0, self._lpcParameters)
+  def _rescaleInput(self):
+    scaled = self._lpcParameters['scaled']
+    h = self._lpcParameters['h']
     
+    if scaled: 
+      self._dataRange = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
+      self.Xi = self.Xi / self._dataRange
+      if h is None:
+        h = 0.1
+        self.resetScaleParameters(h, self._lpcParameters['t0'])  
+    else:
+      if h is None:
+        self._dataRange = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
+        h = list(0.1 * self._dataRange)
+        self.resetScaleParameters(h, self._lpcParameters['t0'])
+    #make sure that t0 is set 
+    if self._lpcParameters['t0'] is None:
+      self._lpcParameters['t0'] = mean(h)  
+  
   def setDataPoints(self, X):
     
     if X.ndim != 2:
