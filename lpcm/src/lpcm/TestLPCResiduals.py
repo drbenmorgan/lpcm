@@ -5,7 +5,7 @@ Created on 28 Oct 2011
 '''
 from lpcm.lpc import LPCImpl
 from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
-from numpy.core.numeric import array
+from numpy.core.numeric import array, zeros
 from numpy.ma.core import arange
 from pprint import pprint
 from random import gauss
@@ -57,17 +57,29 @@ class TestLPCResiduals(unittest.TestCase):
     residuals_graph = residuals_calc.getGlobalResiduals(lpc_curve[0])
   
   def testResidualsRunner(self):
-    x = map(lambda x: x + gauss(0,0.005 + 0.3*x*x), arange(-1,1,0.005))
-    y = map(lambda x: x + gauss(0,0.005 + 0.3*x*x), arange(-1,1,0.005))
-    z = map(lambda x: x + gauss(0,0.005 + 0.3*x*x), arange(-1,1,0.005))
+    x = map(lambda x: x + gauss(0,0.005 + 0.3*x*x), arange(-1,1,0.05))
+    y = map(lambda x: x + gauss(0,0.005 + 0.3*x*x), arange(-1,1,0.05))
+    z = map(lambda x: x + gauss(0,0.005 + 0.3*x*x), arange(-1,1,0.05))
+    line = array(zip(x,y,z))
+    lpc = LPCImpl(h = 0.2, convergence_at = 0.0001, it = 100, mult = 5)
+    lpc_curve = lpc.lpc(X=line)
+    residuals_calc = LPCResiduals(line, tube_radius = 0.15)
+    residuals_runner = LPCResidualsRunner(lpc, residuals_calc)
+    residuals_runner.setTauRange([0.05, 0.07])
+    residuals = residuals_runner.calculateResiduals()
+    pprint(residuals)
+    
+  
+  def testDistanceBetweenCurves(self):
+    x = arange(-1,1,0.005)
+    y = arange(-1,1,0.005)
+    z = zeros((2*len(x)))
+    
     line = array(zip(x,y,z))
     lpc = LPCImpl(h = 0.05, convergence_at = 0.0001, it = 100, mult = 2)
     lpc_curve = lpc.lpc(X=line)
     residuals_calc = LPCResiduals(line, tube_radius = 0.2)
-    residuals_runner = LPCResidualsRunner(lpc, residuals_calc)
-    residuals_runner.setTauRange([0.005, 0.007])
-    residuals = residuals_runner.calculateResiduals()
-    pprint(residuals)
+    dist = residuals_calc._distanceBetweenCurves(lpc_curve[0], lpc_curve[1])
     
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testLPCResiduals']

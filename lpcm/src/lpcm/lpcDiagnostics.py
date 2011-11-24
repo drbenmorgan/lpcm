@@ -45,13 +45,27 @@ class LPCResidualsRunner():
       containment_matrix = self._calculateHitContainmentMatrix(curve_residuals, tau)
       containment_matrices[tau] = containment_matrix
     
-    residuals = {'curve_residuals': curve_residuals, 'containment_matrices': containment_matrices}
+    distance_matrix = self._calculateCurveDistanceMatrix(curves)
+    
+    residuals = {'curve_residuals': curve_residuals, 'distance_matrix': distance_matrix, 'containment_matrices': containment_matrices}
     return residuals    
-      
+  
+  def _calculateCurveDistanceMatrix(self, curves):
+    num_curves = len(curves)
+    distance_matrix = zeros((num_curves, num_curves))
+    for i in range(num_curves):
+      curve_i = curves[i]
+      for j in range(i+1, num_curves):  
+        curve_j = curves[j]
+        distance_matrix[i,j] = self._lpcResiduals._distanceBetweenCurves(curve_i, curve_j)
+        distance_matrix[j,i] = self._lpcResiduals._distanceBetweenCurves(curve_j, curve_i)
+    return distance_matrix
+  
   def _calculateHitContainmentMatrix(self, curve_residuals, tau):
     '''
     Calculates a 2d array where the (i,j)th entry is the proportion of elements in curve_residuals[i]['coverage_indices'][tau] that are also contained
-    in curve_residuals[j]['coverage_indices'][tau]
+    in curve_residuals[j]['coverage_indices'][tau] A value of -1 indicates that the curve corresponding to the row index had no hits within tau of the 
+    curve
     ''' 
     num_curves = len(curve_residuals)
     containment_matrix = ones((num_curves, num_curves))
@@ -60,8 +74,14 @@ class LPCResidualsRunner():
       for j in range(i+1, num_curves):  
         labels_j = curve_residuals[j]['coverage_indices'][tau]
         cardinality_intersect = len(labels_i & labels_j)
-        containment_matrix[i, j] = float(cardinality_intersect)/len(labels_i)
-        containment_matrix[j, i] = float(cardinality_intersect)/len(labels_j)
+        if len(labels_i) == 0:
+          containment_matrix[i, j] = -1
+        else: 
+          containment_matrix[i, j] = float(cardinality_intersect)/len(labels_i)
+        if len(labels_j) == 0:
+          containment_matrix[j,i] = -1
+        else: 
+          containment_matrix[j,i] = float(cardinality_intersect)/len(labels_j)
     return containment_matrix
     
 class LPCResiduals(PrmDictBase):
@@ -84,6 +104,31 @@ class LPCResiduals(PrmDictBase):
     eps = self._params['eps']
     return self._treeX.query_ball_point(curve['save_xd'], ball_radius, 2.0, eps)
   
+  def _distanceBetweenCurves(self, l1, l2):
+    '''Defines the asymmetric distance between two pielcewise linear curves, each defined by l1['save_xd']/l2['save_xd'] (a 2d (#points, #Euclidean dimension of points) array),
+    as the average distance between the points defining l1 and the curve l2, where this distance between point and curve is the minimum value of 
+    self._distancePointToLineSegment for line segments in l2
+    Currently, since lines are at most iter segments long (as determined by lpc initialisation) and num iterations is typically far less than 500 since
+    convergence happens long before iter iterations, the current code just scans all segments in l2 to find the minimum distance
+    Works from endpoints rather than midpoints as in practice this should make only a nominal difference to the results
+    This is likely to be a massive bottle neck as it scales with num of segments^2.
+    '''
+    weighted_dist = 0
+    l1_curve = l1['save_xd']
+    l1_lamb = l1['lamb']
+    l2_curve = l2['save_xd']
+    for i in range(len(l1_curve) - 1):
+      lamb = l1_lamb[i+1] - l1_lamb[i]
+      if len(l2_curve) < 2:
+        raise ValueError, 'Curve must contain at least 2 points'
+      min_d = self._distancePointToLineSegment(l2_curve[0], l2_curve[1], l1_curve[i])[0]
+      for j in range(1, len(l2_curve) - 1):
+        d = self._distancePointToLineSegment(l2_curve[j], l2_curve[j+1], l1_curve[i])[0] 
+        if d < min_d:
+          min_d = d
+      weighted_dist = weighted_dist + (lamb * min_d)
+    return weighted_dist / l1_lamb[-1]
+    
   def _distancePointToLineSegment(self, a, b, p):
     '''
     Returns tuple of minimum distance to the directed line segment AB from p, and the distance along AB of the point of intersection
