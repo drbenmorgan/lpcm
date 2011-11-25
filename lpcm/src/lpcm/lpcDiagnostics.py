@@ -17,8 +17,8 @@ class LPCResidualsRunner():
   in cylinder m contained in cylinder n (i.e. the degree of overlap in the hits associated to each path, used later to prune the result set
   by removing or concatenating curves 
   '''
-  def __init__(self, lpc_algorithm, lpc_residuals):
-    self._lpcAlgorithm = lpc_algorithm
+  def __init__(self, lpc_curves, lpc_residuals):
+    self._lpcCurves = lpc_curves
     self._lpcResiduals = lpc_residuals
     self._tauRange = None
   def setTauRange(self,tau_range):
@@ -29,8 +29,9 @@ class LPCResidualsRunner():
   def calculateResiduals(self):
     if self._tauRange is None:
       raise ValueError, 'tauRange, the list of cylinder radii, has not yet been defined'
-    curves = self._lpcAlgorithm.getCurve()
+    curves = self._lpcCurves
     curve_residuals = []
+    '''
     for curve in curves:
         tube_residuals = self._lpcResiduals.getTubeResiduals(curve)
         path_residuals =  self._lpcResiduals.getPathResidualDiags(curve)
@@ -44,10 +45,10 @@ class LPCResidualsRunner():
     for tau in self._tauRange:
       containment_matrix = self._calculateHitContainmentMatrix(curve_residuals, tau)
       containment_matrices[tau] = containment_matrix
-    
+    '''
     distance_matrix = self._calculateCurveDistanceMatrix(curves)
-    
-    residuals = {'curve_residuals': curve_residuals, 'distance_matrix': distance_matrix, 'containment_matrices': containment_matrices}
+    residuals = {'distance_matrix': distance_matrix}
+    #residuals = {'curve_residuals': curve_residuals, 'distance_matrix': distance_matrix, 'containment_matrices': containment_matrices}
     return residuals    
   
   def _calculateCurveDistanceMatrix(self, curves):
@@ -89,6 +90,7 @@ class LPCResiduals(PrmDictBase):
   classdocs
   '''
   _TUBE_BALL_MULTIPLICITY_FACTOR = 2
+  _CURVE_DIST_MAX_SEGMENTS = 50
   
   def _calculateBallRadius(self, curve, tube_radius):
     if self._maxSegmentLength is None:
@@ -111,23 +113,38 @@ class LPCResiduals(PrmDictBase):
     Currently, since lines are at most iter segments long (as determined by lpc initialisation) and num iterations is typically far less than 500 since
     convergence happens long before iter iterations, the current code just scans all segments in l2 to find the minimum distance
     Works from endpoints rather than midpoints as in practice this should make only a nominal difference to the results
-    This is likely to be a massive bottle neck as it scales with num of segments^2.
+    This is likely to be a massive bottle neck as it scales with num of segments^2, so there's a hack included so that each curve is reduced to 
+    a maximum number of segments by taking every other skip_l1 = (len(l1)-2) / max_segments elements from each curve (i.e calculate the distance from
+    every skip_l1'th point of l1 to the segments determined by every skip_l2'th element of l2. max_segments must be an integer > 0
     '''
     weighted_dist = 0
     l1_curve = l1['save_xd']
     l1_lamb = l1['lamb']
     l2_curve = l2['save_xd']
-    for i in range(len(l1_curve) - 1):
+    if len(l2_curve) < 2 or len(l1_curve) < 2:
+        raise ValueError, 'Curves must contain at least 2 points'
+  
+    max_segments = LPCResiduals._CURVE_DIST_MAX_SEGMENTS
+    if max_segments is None:
+      skip_l1 = 1
+      skip_l2 = 1
+    else:
+      if max_segments < 1:
+        raise ValueError, '_CURVE_DIST_MAX_SEGMENTS must be at least 1'
+      skip_l1 = ((len(l1_curve) - 2) / max_segments) + 1
+      skip_l2 = ((len(l2_curve) - 2) / max_segments) + 1
+    
+    l2_subset = range(0, len(l2_curve), skip_l2)
+    l2_curve = l2_curve[l2_subset]
+    for i in range(0, len(l1_curve) - 1, skip_l1):
       lamb = l1_lamb[i+1] - l1_lamb[i]
-      if len(l2_curve) < 2:
-        raise ValueError, 'Curve must contain at least 2 points'
       min_d = self._distancePointToLineSegment(l2_curve[0], l2_curve[1], l1_curve[i])[0]
       for j in range(1, len(l2_curve) - 1):
         d = self._distancePointToLineSegment(l2_curve[j], l2_curve[j+1], l1_curve[i])[0] 
         if d < min_d:
           min_d = d
       weighted_dist = weighted_dist + (lamb * min_d)
-    return weighted_dist / l1_lamb[-1]
+    return weighted_dist / l1_lamb[-(1 + (len(l1_curve)-2)%skip_l1)]
     
   def _distancePointToLineSegment(self, a, b, p):
     '''

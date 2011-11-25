@@ -6,7 +6,8 @@ Created on 28 Oct 2011
 from lpcm.lpc import LPCImpl
 from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
 from numpy.core.numeric import array, zeros
-from numpy.ma.core import arange
+from numpy.core.shape_base import hstack
+from numpy.ma.core import arange, ones
 from pprint import pprint
 from random import gauss
 import unittest
@@ -64,23 +65,20 @@ class TestLPCResiduals(unittest.TestCase):
     lpc = LPCImpl(h = 0.2, convergence_at = 0.0001, it = 100, mult = 5)
     lpc_curve = lpc.lpc(X=line)
     residuals_calc = LPCResiduals(line, tube_radius = 0.15)
-    residuals_runner = LPCResidualsRunner(lpc, residuals_calc)
+    residuals_runner = LPCResidualsRunner(lpc.getCurve(), residuals_calc)
     residuals_runner.setTauRange([0.05, 0.07])
     residuals = residuals_runner.calculateResiduals()
     pprint(residuals)
     
   
   def testDistanceBetweenCurves(self):
+    l1 = {'save_xd': array([[0.5,1,0], [1.5,1,0]]), 'lamb':array([0.0, 1.0])}
+    l2 = {'save_xd': array([[0,0,0], [1,0,0], [2,0,0]])}
     x = arange(-1,1,0.005)
-    y = arange(-1,1,0.005)
-    z = zeros((2*len(x)))
-    
-    line = array(zip(x,y,z))
-    lpc = LPCImpl(h = 0.05, convergence_at = 0.0001, it = 100, mult = 2)
-    lpc_curve = lpc.lpc(X=line)
+    line = array(zip(x,x,x)) #not actually needed for calcualtion, but dummy argument to residuals_cal for now
     residuals_calc = LPCResiduals(line, tube_radius = 0.2)
-    dist = residuals_calc._distanceBetweenCurves(lpc_curve[0], lpc_curve[1])
-    
+    dist = residuals_calc._distanceBetweenCurves(l1,l2)
+  
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testLPCResiduals']
     unittest.main()

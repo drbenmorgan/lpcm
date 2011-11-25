@@ -7,6 +7,8 @@ from collections import defaultdict
 from itertools import cycle
 from latte.io_formats import LamuFileReader
 from lpcm.lpc import LPCImpl
+from lpcm.lpcAnalysis import LPCCurvePruner
+from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
 from lpcm.lpcStartPoints import lpcMeanShift
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 from numpy.core.numeric import array
@@ -83,6 +85,7 @@ def toyLPCPlotter(Xi, lpc_curve):
   '''
   Draws a lovely 3d picture of the clusters, start points and resutling lpc curves, colour coded by cluster that seeded them
   '''
+  plt.close('all')
   fig = plt.figure(0)
   fig_angle = plt.figure(1)
   fig_rho = plt.figure(2)
@@ -117,7 +120,7 @@ if __name__ == '__main__':
   #read root events, calculate lpc_curves and pickle curve and parameter data
   toy = ToyTracks(rootfile, lpc)
   runner = toyLPCRunner(toy, outfile)
-  num_events = 2
+  num_events = 5
   metadata_filename = runner(num_events)
   
   #read in parameters from an event batch, print them, then plot the first event from that batch
@@ -129,6 +132,22 @@ if __name__ == '__main__':
   f.close()
   f = open(curves_filename, 'rb')
   evt_curves = cPickle.load(f)
-  toyLPCPlotter(evt_curves['Xi'], evt_curves['lpc_curve'])
+  evt_curves = cPickle.load(f)
+  evt_curves = cPickle.load(f)
+  #toyLPCPlotter(evt_curves['Xi'], evt_curves['lpc_curve'])
+  #now calcualte the residuals
+  residuals_calc = LPCResiduals(evt_curves['Xi'], tube_radius = 0.15)
+  residuals_runner = LPCResidualsRunner(evt_curves['lpc_curve'], residuals_calc)
+  residuals_runner.setTauRange([0.05, 0.07])
+  #residuals = residuals_runner.calculateResiduals()
+  #pprint(residuals)
+  analysis = LPCCurvePruner(residuals_runner)
+  rem_curves = analysis._calculateAbsoluteScaleDistanceMatrixCurves()
+  remaining_curve_indices = list(set(range(0,len(evt_curves['lpc_curve']))) - set(rem_curves)) #TODO, betterify this monstrosity
+  remaining_curves = []
+  for i in remaining_curve_indices:
+    remaining_curves.append(evt_curves['lpc_curve'][i])
+  toyLPCPlotter(evt_curves['Xi'], remaining_curves)
+
 
   

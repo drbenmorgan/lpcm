@@ -305,7 +305,10 @@ class LPCImpl(PrmDictBase):
     h = self._lpcParameters['h']
     
     if scaled: 
-      self._dataRange = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
+      data_range = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
+      if any(data_range == 0):
+        raise ValueError, 'Data cannot be scale because the range in at least 1 direction is zero (i.e. data lies wholly in plane x/y/z = c)'
+      self._dataRange = data_range
       self.Xi = self.Xi / self._dataRange
       if h is None:
         h = 0.1
