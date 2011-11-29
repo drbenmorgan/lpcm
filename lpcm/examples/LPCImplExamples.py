@@ -32,6 +32,7 @@ def plot1():
   curve = lpc_curve[0]['save_xd']
   ax.scatter(curve[:,0],curve[:,1],curve[:,2],c = 'red')
   return fig1
+
 def plot2():
   fig5 = plt.figure()
   x = map(lambda x: x + gauss(0,0.02)*(1-x*x), arange(-1,1,0.001))
@@ -64,6 +65,7 @@ def plot2():
   fig9 = plt.figure()
   plt.plot(range(len(lpc_curve[0]['lamb'])), lpc_curve[0]['lamb'])
   saveToPdf(fig9, '/tmp/testNoisyLine2PathLength.pdf')
+
 def helixNonRandom():
   #Parameterise a helix (no noise)
   fig3 = plt.figure()
@@ -121,6 +123,7 @@ def helixHeteroscedasticCrossingDemo():
   ax.scatter(x,y,z, c = 'red')
   ax.plot(curve[:,0],curve[:,1],curve[:,2])
   saveToPdf(fig6, '/tmp/helixHeteroscedasticWithoutCrossing.pdf')
+
 def twoDisjointLinesWithMSClustering():
  
   t = arange(-1,1,0.002)
@@ -147,7 +150,8 @@ def twoDisjointLinesWithMSClustering():
     curve = lpc_curve[k]['save_xd']
     ax.plot(curve[:,0],curve[:,1],curve[:,2], c = col, linewidth = 3)
   plt.show()
-  print 'Done and dusted'
+
+
 def helixHeteroscedasticDiags():
   #Parameterise a helix (no noise)
   fig5 = plt.figure()
@@ -182,9 +186,6 @@ def helixHeteroscedasticDiags():
   fig9 = plt.figure()
   plt.plot(range(len(lpc_curve[0]['lamb'])), lpc_curve[0]['lamb'])
   saveToPdf(fig9, '/tmp/helixHeteroscedasticPathLength.pdf')
-
-def lamuMuonTest():
-  pass
 
 def saveToPdf(fig, filename):
   pp = PdfPages(filename)

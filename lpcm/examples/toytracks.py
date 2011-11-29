@@ -260,7 +260,7 @@ if __name__ == '__main__':
       
       pruner = LPCCurvePruner(residuals_runner)
       remaining_curves = pruner.pruneCurves()
-      #toyLPCPlotter(evt['Xi'], remaining_curves)
+      toyLPCPlotter(evt['Xi'], remaining_curves)
   
       tau = 0.015
       #muon_proton_hits = truth_evt.getParticleHits([13, 2212])

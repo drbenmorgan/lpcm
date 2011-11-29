@@ -38,21 +38,18 @@ class LPCResidualsRunner():
     curve_residuals = None
     curves = self._lpcCurves
     
-    
     if calc_residuals == True:
       if self._tauRange is None:
         raise ValueError, 'tauRange, the list of cylinder radii, has not yet been defined'
-      curve_residuals = self._calculateCurveResiduals(curves)
-      
+      curve_residuals = self._calculateCurveResiduals(curves)  
     if calc_containment_matrix == True:
       containment_matrices = {}
       for tau in self._tauRange:
         containment_matrix = self._calculateHitContainmentMatrix(curve_residuals, tau)
         containment_matrices[tau] = containment_matrix
-    
     if calc_distance_matrix == True:
       distance_matrix = self._calculateCurveDistanceMatrix(curves)
-
+    
     residuals = {'curve_residuals': curve_residuals, 'distance_matrix': distance_matrix, 'containment_matrices': containment_matrices}
     return residuals    
  
@@ -113,11 +110,13 @@ class LPCResiduals(PrmDictBase):
     if self._maxSegmentLength is None:
       self._maxSegmentLength = self._calculateMaxSegmentLength(curve)
     return max(0.5*self._maxSegmentLength, 1.1547 * tube_radius) 
+  
   def _calculatePrunedPointResiduals(self, curve):
     ball_radius = self._calculateBallRadius(curve, self._params['tube_radius'])
     eps = self._params['eps']
     k = LPCResiduals._TUBE_BALL_MULTIPLICITY_FACTOR * self._params['k']
     return self._treeX.query(curve['save_xd'], k, eps, 2.0, ball_radius)
+  
   def _calculateNNBallIndices(self, curve, ball_radius):
     ball_radius = self._calculateBallRadius(curve, ball_radius)
     eps = self._params['eps']

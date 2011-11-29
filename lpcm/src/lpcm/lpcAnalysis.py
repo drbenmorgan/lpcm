@@ -7,7 +7,6 @@ from lpcm.lpc import LPCImpl
 from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
 from numpy.core.numeric import array
 from numpy.ma.core import arange
-from random import gauss
 from scitools.PrmDictBase import PrmDictBase
 
 
@@ -16,8 +15,6 @@ class LPCCurvePruner(PrmDictBase):
     Helper functions for using lpc curves and their residuals to prune similar curves from lpc output. Answers the question, 'When
     are two lpc curves the same?'
     '''
-    
-
     def __init__(self, residuals_runner, **params):
       '''
       Constructor
@@ -51,6 +48,7 @@ class LPCCurvePruner(PrmDictBase):
         if e[0] < tau and (e[1][0] not in removed_curves) and (e[1][1] not in removed_curves):
           removed_curves.append(e[1][0])
       return removed_curves
+    
     def pruneCurves(self):
       curves = self._residualsRunner._lpcCurves
       short_curves = []
@@ -66,8 +64,9 @@ class LPCCurvePruner(PrmDictBase):
       for i in remaining_curve_indices:
         remaining_curves.append(self._residualsRunner._lpcCurves[i])
       return remaining_curves
+
 if __name__ == "__main__":
-  '''JUst a quick test of calculateAbsoluteScaleDistanceMatrixCurves for now. All the gumpf beforehand is
+  '''Just a quick test of calculateAbsoluteScaleDistanceMatrixCurves for now. All the gumpf beforehand is
   redundant to the test, just creating a chain of objects to instantiate the LPCCurvePruner instance
   '''
   t =  arange(-1,1,0.1)
@@ -84,5 +83,4 @@ if __name__ == "__main__":
              [ 0.18029958,  0.18030112,  0.18029657,  0.00034616,  0.        ]])
   analysis._residuals = {'distance_matrix': a}
   rem_curves = analysis._calculateAbsoluteScaleDistanceMatrixCurves()      
-  print 'breakpoint'
         

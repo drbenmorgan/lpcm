@@ -23,6 +23,7 @@ class lpcRandomStartPoints():
   '''
   def __init__(self):
     pass
+  
   def __call__(self, X, n = 10, x0 = None):
     '''
     n, required number of start points, if  None, defaults ot 10 start points
@@ -58,6 +59,7 @@ class lpcMeanShift(PrmDictBase):
   @staticmethod
   def _positivityCheck(x):
     return isinstance(x, (int, float)) and x > 0
+ 
   def _removeNonTracklikeClusterCenters(self):
     labels = self._meanShift.labels_
     labels_unique = unique(labels)
@@ -78,13 +80,11 @@ class lpcMeanShift(PrmDictBase):
     return array(pruned_cluster_centers)
   
   def __init__(self, **params): 
-    
     super(lpcMeanShift, self).__init__()
     self._lpcParameters = { 'ms_h': None, 
                             'ms_sub': 30,
                             'rho_threshold': 0.2
                           }
-    
     self._prm_list = [self._lpcParameters] 
     self.user_prm = None #extension of parameter set disallowed
     self._type_check.update({ 'ms_h': lambda x: (x is None) or lpcMeanShift._positivityCheck(x) or (isinstance(x, list) and all(map(lpcMeanShift._positivityCheck, x)) ) , 
@@ -96,6 +96,8 @@ class lpcMeanShift(PrmDictBase):
       self._meanShift = MeanShift()
     else:
       self._meanShift = MeanShift(bandwidth = mean(self._lpcParameters['ms_h']))
+    
+  def __call__(self, X, n = None, x0 = None):
     '''
     Generates n seed points for the lpc algorithm. 
     X, 2 dimensional [#points, #dimension of points] array containing the data for which local density modes is to calculated
@@ -106,8 +108,6 @@ class lpcMeanShift(PrmDictBase):
     
     Returns the lpc seed points as a 2 dimensional [#seed points, #dimension of seed points] array
     '''
-  def __call__(self, X, n = None, x0 = None):
-    
     self._Xi = X
     if x0 is None:
       N = self._Xi.shape[0]
@@ -142,8 +142,7 @@ class lpcMeanShift(PrmDictBase):
     
     bandwidth = mean(self._lpcParameters['ms_h'])
     self._meanShift = MeanShift(bandwidth = bandwidth)
-    
-       
+      
   def getClusterLabels(self):
     return self._meanShift.labels_
     
