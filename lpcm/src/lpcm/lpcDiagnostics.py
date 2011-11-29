@@ -21,36 +21,53 @@ class LPCResidualsRunner():
     self._lpcCurves = lpc_curves
     self._lpcResiduals = lpc_residuals
     self._tauRange = None
+  
   def setTauRange(self,tau_range):
     '''
     tau_range, 1d list of floats , each defining the radius of the cylinder around lpc curves used to associate self._lpcAlgorithm.Xi points to curves
     '''   
     self._tauRange = tau_range
-  def calculateResiduals(self):
-    if self._tauRange is None:
-      raise ValueError, 'tauRange, the list of cylinder radii, has not yet been defined'
-    curves = self._lpcCurves
-    curve_residuals = []
-    '''
-    for curve in curves:
-        tube_residuals = self._lpcResiduals.getTubeResiduals(curve)
-        path_residuals =  self._lpcResiduals.getPathResidualDiags(curve)
-        coverage_indices = {}
-        for tau in self._tauRange:
-          indices = self._lpcResiduals.calculateCoverageIndices(curve, tau)
-          coverage_indices[tau] = indices
-        curve_residuals.append({'tube_residuals': tube_residuals, 'path_residuals': path_residuals, 'coverage_indices': coverage_indices})
+
+  def calculateResiduals(self, calc_residuals = True, calc_distance_matrix = True, calc_containment_matrix = True):  
     
-    containment_matrices = {}
-    for tau in self._tauRange:
-      containment_matrix = self._calculateHitContainmentMatrix(curve_residuals, tau)
-      containment_matrices[tau] = containment_matrix
-    '''
-    distance_matrix = self._calculateCurveDistanceMatrix(curves)
-    residuals = {'distance_matrix': distance_matrix}
-    #residuals = {'curve_residuals': curve_residuals, 'distance_matrix': distance_matrix, 'containment_matrices': containment_matrices}
+    if calc_containment_matrix == True and calc_residuals == False:
+      raise ValueError, 'You cannot calculate the containment matrix without residuals having first been calculated'
+    
+    distance_matrix = None
+    containment_matrices = None
+    curve_residuals = None
+    curves = self._lpcCurves
+    
+    
+    if calc_residuals == True:
+      if self._tauRange is None:
+        raise ValueError, 'tauRange, the list of cylinder radii, has not yet been defined'
+      curve_residuals = self._calculateCurveResiduals(curves)
+      
+    if calc_containment_matrix == True:
+      containment_matrices = {}
+      for tau in self._tauRange:
+        containment_matrix = self._calculateHitContainmentMatrix(curve_residuals, tau)
+        containment_matrices[tau] = containment_matrix
+    
+    if calc_distance_matrix == True:
+      distance_matrix = self._calculateCurveDistanceMatrix(curves)
+
+    residuals = {'curve_residuals': curve_residuals, 'distance_matrix': distance_matrix, 'containment_matrices': containment_matrices}
     return residuals    
-  
+ 
+  def _calculateCurveResiduals(self, curves):
+    curve_residuals = []
+    for curve in curves:
+            tube_residuals = self._lpcResiduals.getTubeResiduals(curve)
+            path_residuals =  self._lpcResiduals.getPathResidualDiags(curve)
+            coverage_indices = {}
+            for tau in self._tauRange:
+              indices = self._lpcResiduals.calculateCoverageIndices(curve, tau)
+              coverage_indices[tau] = indices
+            curve_residuals.append({'tube_residuals': tube_residuals, 'path_residuals': path_residuals, 'coverage_indices': coverage_indices})
+    return curve_residuals
+          
   def _calculateCurveDistanceMatrix(self, curves):
     num_curves = len(curves)
     distance_matrix = zeros((num_curves, num_curves))
@@ -116,6 +133,8 @@ class LPCResiduals(PrmDictBase):
     This is likely to be a massive bottle neck as it scales with num of segments^2, so there's a hack included so that each curve is reduced to 
     a maximum number of segments by taking every other skip_l1 = (len(l1)-2) / max_segments elements from each curve (i.e calculate the distance from
     every skip_l1'th point of l1 to the segments determined by every skip_l2'th element of l2. max_segments must be an integer > 0
+    TODO - tweak the calculation toensure that the endpoints of curves are included, irrespective of the max_segments limit
+    (i.e. tag on the last data point of the final segment if it's not already included in the approximation)
     '''
     weighted_dist = 0
     l1_curve = l1['save_xd']

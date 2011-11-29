@@ -3,9 +3,12 @@ Created on 15 Nov 2011
 
 @author: droythorne
 '''
-from numpy.core.numeric import array
+from numpy.core.numeric import array, dot
 from numpy.core.shape_base import vstack
-from numpy.ma.core import mean, floor
+from numpy.lib.function_base import unique, average
+from numpy.lib.shape_base import vsplit
+from numpy.linalg.linalg import eigh
+from numpy.ma.core import mean, floor, transpose, ravel, sqrt
 from numpy.random import random_integers
 from random import sample
 from scitools.PrmDictBase import PrmDictBase
@@ -55,19 +58,39 @@ class lpcMeanShift(PrmDictBase):
   @staticmethod
   def _positivityCheck(x):
     return isinstance(x, (int, float)) and x > 0
+  def _removeNonTracklikeClusterCenters(self):
+    labels = self._meanShift.labels_
+    labels_unique = unique(labels)
+    cluster_centers = self._meanShift.cluster_centers_
+    rho_clusters = []
+    for k in range(len(labels_unique)):
+      cluster_members = labels == k
+      cluster_center = cluster_centers[k]
+      cluster = array(zip(self._Xi[cluster_members, 0], self._Xi[cluster_members, 1], self._Xi[cluster_members, 2]))
+      mean_sub = cluster - cluster_center 
+      cov_x = dot(transpose(mean_sub), mean_sub) 
+      eigen_cov = eigh(cov_x)
+      sorted_eigen_cov = zip(eigen_cov[0],map(ravel,vsplit(eigen_cov[1].transpose(),len(eigen_cov[1]))))
+      sorted_eigen_cov.sort(key = lambda elt: elt[0], reverse = True)   
+      rho = sorted_eigen_cov[1][0] / sorted_eigen_cov[0][0] #Ratio of two largest eigenvalues   
+      rho_clusters.append({'k': k, 'rho': rho})
+    pruned_cluster_centers = [cluster_centers[clusters['k']] for clusters in rho_clusters if clusters['rho'] < self._lpcParameters['rho_threshold'] ]
+    return array(pruned_cluster_centers)
   
   def __init__(self, **params): 
     
     super(lpcMeanShift, self).__init__()
     self._lpcParameters = { 'ms_h': None, 
-                            'ms_sub': 30
+                            'ms_sub': 30,
+                            'rho_threshold': 0.2
                           }
     
     self._prm_list = [self._lpcParameters] 
     self.user_prm = None #extension of parameter set disallowed
     self._type_check.update({ 'ms_h': lambda x: (x is None) or lpcMeanShift._positivityCheck(x) or (isinstance(x, list) and all(map(lpcMeanShift._positivityCheck, x)) ) , 
-                              'ms_sub': lambda x: lpcMeanShift._positivityCheck and x < 100
-                           })
+                              'ms_sub': lambda x: lpcMeanShift._positivityCheck and x < 100,
+                              'rho_threshold': lambda x: lpcMeanShift._positivityCheck and x < 1
+                            })
     self.set(**params)
     if self._lpcParameters['ms_h'] is None:
       self._meanShift = MeanShift()
@@ -97,11 +120,14 @@ class lpcMeanShift(PrmDictBase):
     self._meanShift.seeds = ms_seeds
     self._meanShift.fit(self._Xi)
     
+    pruned_cluster_centers = self._removeNonTracklikeClusterCenters()
+    if len(pruned_cluster_centers) == 0:
+      pruned_cluster_centers = None
+    lpcRSP = lpcRandomStartPoints()
     if n is None:
-      return self._meanShift.cluster_centers_
+      return lpcRSP(self._Xi, n = 2, x0 = pruned_cluster_centers)
     else:
-      lpcRSP = lpcRandomStartPoints()
-      return lpcRSP(self._Xi, n = n, x0 = self._meanShift.cluster_centers_)
+      return lpcRSP(self._Xi, n = n, x0 = pruned_cluster_centers)
   
   def setScaleParameters(self, ms_h = None):
     '''This is for initially setting the scale parameters, and only has an effect if self._lpcParamters['ms_h'] is None
