@@ -2,6 +2,13 @@
 Created on 6 Oct 2011
 
 @author: droythorne
+
+lpc
+===
+
+This module provides the depth 1, local principal curve algorithm as described 
+Einbeck, J., Tutz, G., & Evers, L. (2005), Local principal curves, Statistics and Computing 15, 301-313
+and has arguments, defaults and behaviour similar to that of the lpc function in CRAN package 'LPCM'.    
 ''' 
 from copy import deepcopy
 from lpcm.lpcStartPoints import lpcRandomStartPoints
@@ -12,48 +19,102 @@ from numpy.core.shape_base import vstack, hstack
 from numpy.lib.function_base import average
 from numpy.lib.shape_base import vsplit
 from numpy.linalg.linalg import eig, eigh
-from numpy.ma.core import mean, mod, ravel, where, copy, sqrt
+from numpy.ma.core import mean, mod, ravel, where, copy
 from scipy.spatial.distance import cdist
 from scipy.stats.distributions import norm as gauss
 from scitools.Lumpy import iscallable
 from scitools.PrmDictBase import PrmDictBase
 import numpy
 
+__all__ = ['Direction', 'LPCImpl']
 
 class Direction:
+  '''Defines the orientation of an lpc curve
+  ''' 
   FORWARD = 1
   BACK = -1
   
 class LPCImpl(PrmDictBase):
-  '''
-  Implements lpc calculation to mimic behaviour of lpc.R code and associated R functions/classes
+  '''Functor that implements lpc calculation to mimic behaviour of lpc.R code and associated R functions/classes. Computes the actual local
+  principal curve, i.e. a sequence of local centers of mass, along with other sequences defined at the local centers of mass that characterise
+  the curve (e.g. cumulative path length) and and its relationship with the data points (e.g. ratio of largest two principal component eigenvalues)
   '''
   @staticmethod
   def _positivityCheck(x):
     return isinstance(x, (int, float)) and x > 0
   
   def _selectStartPoints(self, x0):
-    '''
-    Delegates to _selectStartPoints the task of generating a number, mult, seed points for multiple passes of the algorithm 
+    '''Delegates to _selectStartPoints the task of generating mult seed points for multiple passes of the lpc algorithm. Depending on the _startPointsGenerator
+    used, x0 will either act as seed points for the start points generator (lpcMeanShift), or explicit start points (lpcRandomStartPoints)
+    
+    x0: 2-dim (n,m) numpy.array of floats, n is num of seed points, m is dim of feature space specifies the choice of starting points
+      or seeds for starting points. The eventual number of starting points returned by self._startPointsGenerator is determined by mult - 
+      if mult is an integer, it should return exactly mult start points, otherwise
+          
+          The default choice
+          Optionally, one can also set one or more starting points manually here. This can
+          be done in form of a matrix, where each row corresponds to a
+          starting point, or in form of a vector, where starting points
+          are read in consecutive order from the entries of the vector.
+          The starting point has always to be specified on the original
+          data scale, even if ‘scaled=TRUE’. A fixed number of starting
+          points can be enforced through option ‘mult’ in
+          ‘lpc.control’.
     '''
     mult = self._lpcParameters['mult']
-    
-    self.set_in_dict('mult', mult, self._lpcParameters)
-    
     self.x0 = self._startPointsGenerator(self.Xi, n = mult, x0 = x0)
   
-  def _kern(self, y, x = 0, h = 1):
+  def _kern(self, y, x = 0.0, h = 1.0):
+    '''Gaussian kernel, gives the weight ascribed to points in y relative to x with scale parameter h
+    
+    Parameters
+    ----------
+    y : 1-dim length m, or 2 dimensional (n*m) numpy.array of floats containing coordinates of n, m-dimensional feature points 
+    x : float or 1-dim length m numpy.array of floats containing the coordinates of point relative to which kernel weights are calculated
+    h : float or 1-dim length m numpy.array of floats containing the scale parameter for each dimension
+    NOTE - the final division through by h is present in the original R package, but I'm fairly sure it's an error  
+    '''
     return gauss.pdf((y-x)/h) / h
   
   def _kernd(self, X, x, h):
-    return prod(self._kern(X, x, h), axis = 1)
+    '''Computes separable Gaussian kernel (product of m 1-dim kernels for each coordinate) for each of the n, m-dim feature points of X 
+    relative to point x with scale parameters h (see _kern parameters)
+    
+    Returns
+    -------
+    w: 1-dim, length n array of weights of feature points X relative to x
+    '''
+    w = prod(self._kern(X, x, h), axis = 1)  
+    return w
   
-  def _followx( self, x, way = 'one', phi = 1, last_eigenvector = None, weights = 1.):  
+  def _followx( self, x, way = 'one', last_eigenvector = None, weights = 1.):
+    '''Generates a single lpc curve, from the start point, x. Proceeds in forward ('one'), backward ('back') or both ('two') 
+    directions from this point.  
+    
+    Parameters
+    ----------
+    x : 1-dim numpy.array of floats containing the start point for the lpc algorithm
+    way : one of 'one'/'back'/'two', defines the orientation of the lpc propagation
+    last_eigenvector: see _followXSingleDirection
+    weights: see _followXSingleDirection
+    
+    Returns
+    -------
+    curve : a dictionary comprising a single lpc curve in m-dim feature space, with keys, values as self._followxSingleDirection
+    with the addition of
+              
+      start_point, 1-dim numpy.array of floats of length m;
+      start_point_index, index of start_point in save_xd;
+    
+      For way == 'two', the forward and backward curves are stitched together. save_xd, eigen_vecd, cos_neu_neu, rho and c0 are formed
+      by concatenating the reversed 'back' curve (with start_point removed) with the 'one' curve. high_rho_points are the union of 
+      forward and backward high_rho_points. lamb is the cumulative segment distance along the stitched together save_xd with, as before,
+      lamb[0] = 0.0. TODO, should farm this out to an 'lpcCurve'-type class that knows how to join its instances          
+    '''
     if way == 'one':
       curve = self._followxSingleDirection(
                                   x, 
                                   direction = Direction.FORWARD,
-                                  phi = phi,
                                   last_eigenvector = last_eigenvector,
                                   weights = weights)
       curve['start_point'] = x
@@ -63,7 +124,6 @@ class LPCImpl(PrmDictBase):
       curve = self._followxSingleDirection(
                                   x,
                                   direction = Direction.BACK,
-                                  phi = phi,
                                   last_eigenvector = last_eigenvector,
                                   weights = weights)
       curve['start_point'] = x
@@ -73,13 +133,12 @@ class LPCImpl(PrmDictBase):
       forward_curve =  self._followxSingleDirection(
                                   x, 
                                   direction = Direction.FORWARD,
-                                  phi = phi,
                                   last_eigenvector = last_eigenvector,
                                   weights = weights)
       back_curve =  self._followxSingleDirection(
                                   x,
                                   direction = Direction.BACK,
-                                  phi = phi,
+                                  forward_curve = forward_curve,
                                   last_eigenvector = last_eigenvector,
                                   weights = weights)
       #Stitching - append forward_curve to the end of the reversed back_curve with initial point of back curve removed
@@ -101,7 +160,15 @@ class LPCImpl(PrmDictBase):
   
   def _calculatePathLength(self, save_xd):
     '''Calculates the cumulative Euclidian d-dimensional path length of the piecewise linear curve defined by a series of points save_xd
-       Returns an array with n entries, where n is the number of points defining the curve. First point has distance 0.
+    TODO - factor this out into an 'lpcPath'-type class
+    Parameters
+    ----------
+    save_xd : 2-dim (n*m) numpy.array of floats containing coordinates of n, ordered, m-dimensional feature points defining a
+    piecewise linear curve with n-1 segments
+    
+    Returns
+    ------- 
+    lamb : 1-dim array with n ordered entries, defining the cumulative sum of segment lengths. lamb[0] = 0.
     ''' 
     it = len(save_xd)
     lamb = empty(it)
@@ -115,10 +182,26 @@ class LPCImpl(PrmDictBase):
   def _followxSingleDirection(  self, 
                                 x, 
                                 direction = Direction.FORWARD,
-                                forward_curve = None, 
-                                phi = 1, 
+                                forward_curve = None,
                                 last_eigenvector = None, 
                                 weights = 1.):
+    '''Generates a partial lpc curve dictionary from the start point, x.
+    Arguments
+    ---------
+    x : 1-dim, length m, numpy.array of floats, start point for the algorithm when m is dimension of feature space
+    
+    direction :  bool, proceeds in Direction.FORWARD or Direction.BACKWARD from this point (just sets sign for first eigenvalue) 
+    
+    forward_curve : dictionary as returned by this function, is used to detect crossing of the curve under construction with a
+        previously constructed curve
+        
+    last_eigenvector : 1-dim, length m, numpy.array of floats, a unit vector that defines the initial direction, relative to
+        which the first eigenvector is biased and initial cos_neu_neu is calculated  
+        
+    weights : 1-dim, length n numpy.array of observation weights (can also be used to exclude
+        individual observations from the computation by setting their weight to zero.),
+        where n is the number of feature points 
+    '''
     x0 = copy(x)
     N = self.Xi.shape[0]
     d = self.Xi.shape[1]
@@ -231,7 +314,77 @@ class LPCImpl(PrmDictBase):
 
   def __init__(self, start_points_generator = lpcRandomStartPoints(), **params):
     '''
-    TODO document each parameter within dict and copy warnings/errors (possible?)
+    Arguments
+    ---------
+    start_points_generator: a type callable with a single argument, x0, also implements the function setScaleParameters(h) 
+    (see doc for function self.resetScaleParameters)
+
+    h : float, bandwidth. May be either specified as a single number, then
+        the same bandwidth is used in all dimensions, or as an
+        m-dimensional bandwidth vector (where m is the dimension of feature points). 
+        The default setting is 10 percent of the range in each direction. If ‘scaled =TRUE’
+        then the bandwidth has to be specified in fractions of the
+        data range, e.g. h = [0.2, 0.1, 0.3], rather than absolute values.
+
+    t0 : float, scalar step length. Default setting is ‘t0 = h’ if ‘h’ is a
+        scalar, and ‘t0 = mean(h)’ if ‘h’ is a vector.
+
+    depth (NOT USED): int, maximum depth of branches,  restricted to the
+        values 1,2 or 3 (The original LPC branch has depth 1.  If,
+        along this curve, a point features a high second local PC,
+        this launches a new starting point, and the resulting branch
+        has depth 2.  If, along this branch, a point features a high
+        second local PC, this launches a new starting point, and the
+        resulting branch has depth 3. )
+ 
+    way: "one": go only in direction of the first local eigenvector,
+        "back": go only in opposite direction, "two": go from
+        starting point in both directions.
+
+    scaled: bool, if True, scales each variable by dividing through its range
+      
+    pen: power used for angle penalization. If set to 0, the
+        angle penalization is switched off.
+          
+    it : maximum number of iterations on either side of the starting
+        point within each branch.
+    
+    cross:  If True, curves are stopped when they come
+        too close to an existing branch. Used in the self-coverage
+        function.
+    
+    boundary: This boundary correction [2] reduces the bandwidth adaptively
+        once the relative difference of parameter values between two
+        centers of mass falls below the given threshold. This measure
+        delays convergence and enables the curve to proceed further
+        into the end points. If set to 0, this boundary correction is
+        switched off.
+  
+    convergence_at: this forces the curve to stop if the relative
+        difference of parameter values between two centers of mass
+        falls below the given threshold.  If set to 0, then the curve
+        will always stop after exactly ‘iter’ iterations.
+  
+    mult: integer which enforces a fixed number of starting
+        points.  If the number given here is larger than the number
+        of starting points provided at ‘x0’, then the missing points
+        will be set at random (For example, if d=2, ‘mult=3’, and
+        ‘x0=c(58.5, 17.8, 80,20)’, then one gets the starting points
+        (58.5, 17.8), (80,20), and a randomly chosen third one.
+        Another example for such a situation is ‘x0=NULL’ with
+        ‘mult=1’, in which one random starting point is chosen). If
+        the number given here is smaller the number of starting
+        points provided at ‘x0’, then only the first ‘mult’ starting
+        points will be used.
+    
+    pruning_thresh (NOT USED) : float, used to remove non-dense, depth > 1 branches 
+    
+    rho0: float, steers the birth process of higher-depth starting points
+        by acting as a threshold for definition of high_rho_pts. 
+        Usually, between 0.3 and 0.4
+                
+    gapsize (NOT USED): float, sets scaling of t0 which is applied when 
+        starting depth > 1 branches
     '''
     super(LPCImpl, self).__init__()
     self._lpcParameters = { 'h': None, 
@@ -268,7 +421,7 @@ class LPCImpl(PrmDictBase):
                             })
     self.set(**params)
     self.Xi = None
-    self.x0 = None
+    self.x0 = None #set equal to the return value of _selectStartPoints
     self._dataRange = None
     self._curve = None
     if not iscallable(start_points_generator):
@@ -329,7 +482,12 @@ class LPCImpl(PrmDictBase):
 
   def lpc(self, x0 = None, X=None, weights = None):
     ''' Will return the scaled curve if self._lpcParameters['scaled'] = True, to return the curve on the same scale as the originally input data, call getCurve with unscale = True
+    Arguments
+    ---------
+       x0 : 
+       
     '''
+    
     if X is None:
       if self.Xi is None:
         raise ValueError, 'Data points have not yet been set in this LPCImpl instance. Either supply as X parameter to this function or call setDataPoints'
