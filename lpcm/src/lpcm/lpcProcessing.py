@@ -12,6 +12,7 @@ from lpcm.lpcStartPoints import lpcMeanShift
 from numpy.ma.core import array
 import cPickle
 import os
+import shelve
 
 class LPCParameterParser(object):
   '''
@@ -37,7 +38,7 @@ class LPCParameterParser(object):
       for par in type_node[0]:  
         items = dict(par.items())
         s = 'v=' + items['type'] + '("' + items['value'] + '")' 
-        exec(s)
+        exec(s) #TODO - remove exec, there are clearly better ways to do this!
         params[items['name']] = v
       return {'type': type, 'params': params}
     else:
@@ -122,6 +123,7 @@ class LamuRead(object):
   '''
   '''
   def __init__(self, filename, max_events = None):
+    self.filename = filename
     self._reader = LamuRun(filename)
     self._event_gen = self._reader.events()
     self.max_events = max_events
@@ -134,32 +136,68 @@ class LamuRead(object):
     for index in event_iter:     
       event = LamuEventDecorator(self._event_gen.next())
       yield event    
+  
+  def getParameters(self):
+    return {'max_events': self.max_events, 'filename': self.filename}
 
-class LPCPickler():
+
+class LPCBaseWriter(object):
+  '''Derived classes should implement a 'writeEvent' method that takes an event_id as first argument and 
+  serializable event data as second
+  '''
+  def __init__(self, reader, lpc_algorithm, target_directory, target_filename_prefix):
+    lpc_parameters = lpc_algorithm._lpcParameters
+    reader_parameters = reader.getParameters()
+    param_hash = hash(str((lpc_parameters, reader_parameters)))
+    prefix = os.path.join(target_directory, target_filename_prefix + '_' + str(param_hash))
+    #dump metadata to file
+    self._metadata_filename = self.metadataPickler(lpc_parameters, reader_parameters, prefix, self.__class__.SUFFIX)
+    #open file for wrting event data
+    self.open(prefix)
+  
+  def open(self, prefix):  
+    self._lpc_data = open(prefix + '.pkl', 'w')
+  
+  def close(self):  
+    self._lpc_data.close()
+  
+  def metadataPickler(self, lpc_parameters, reader_parameters, prefix, suffix):
+    #dump metadata to file
+    _metadata_filename = prefix + '_meta.pkl'
+    pk_metadata = open(_metadata_filename, 'w')
+    cPickle.dump({'lpc_filename': prefix + '.' + suffix, 
+                  'reader_parmeters': reader_parameters, 
+                  'lpc_parameters': lpc_parameters}, pk_metadata, 0)
+    pk_metadata.close()
+    return _metadata_filename
+  
+class LPCPickler(LPCBaseWriter):
   '''Pickles the lpc curves (actually a dictionary containing the event_id, the points data (perhaps scaled) and lpc_curves) of each event to a file, with filename 
   determined by the target_filename_prefix concatenated with a hash of the lpc parameters. Dumps the parameters used to generate 
   lpc curves to a file that contains a dictionary containing the lpc_parameters and the filename of the pickled object containing 
   all the event's lpc curves.
   '''
-  def __init__(self, lpc_algorithm, target_directory, target_filename_prefix):
-    lpc_parameters = lpc_algorithm._lpcParameters
-    param_hash = hash(str(lpc_parameters))
-    prefix = os.path.join(target_directory, target_filename_prefix + '_' + str(param_hash))
-    self._pk_lpc_data = open(prefix + '.pkl', 'w')
-    #dump metadata to file
-    self._metadata_filename = prefix + '_meta.pkl'
-    pk_metadata = open(self._metadata_filename, 'w')
-    cPickle.dump({'lpc_filename': prefix + '.pkl', 'lpc_parameters': lpc_parameters}, pk_metadata, 0)
-    pk_metadata.close()
-    
-  def __del__(self):  
-    self._pk_lpc_data.close()
+  SUFFIX = 'pkl'
+  def __init__(self, reader, lpc_algorithm, target_directory, target_filename_prefix):
+    LPCBaseWriter.__init__(self, reader, lpc_algorithm, target_directory, target_filename_prefix)
   
   def writeEvent(self, event_id, event):
     '''event_id is ignored for LPCPickler
     '''   
-    cPickle.dump(event, self._pk_lpc_data, -1)
-    
+    cPickle.dump(event, self._lpc_data, -1)
+class LPCShelver(LPCBaseWriter):
+  SUFFIX = 'shl'
+  def __init__(self, reader, lpc_algorithm, target_directory, target_filename_prefix):
+    LPCBaseWriter.__init__(self, reader, lpc_algorithm, target_directory, target_filename_prefix)
+  
+  def open(self, prefix):
+    '''Overrides the base class to set self._lpc_data as a python shelf 
+    '''
+    self._lpc_data = shelve.open(prefix + '.shl') 
+  
+  def writeEvent(self, event_id, event):
+    self._lpc_data[str(event_id)] = event
+
 class LPCProcessor(object):
   '''
   Class that processes events (reads parameters from filename, runs the lpc algorithm, then serialises the output 
@@ -198,7 +236,9 @@ class LPCProcessor(object):
   def _initSerialization(self):
     serialization_parameters = self._parser.getSerialisationParameters()
     if serialization_parameters['type'] == 'LPCPickler':
-      self._writer = LPCPickler(self._lpcAlgorithm, **serialization_parameters['params'])
+      self._writer = LPCPickler(self._reader, self._lpcAlgorithm, **serialization_parameters['params'])
+    elif serialization_parameters['type'] == 'LPCShelver':
+      self._writer = LPCShelver(self._reader, self._lpcAlgorithm, **serialization_parameters['params'])
     else:
       raise ValueError, 'Specified type of serialization is not recognised'  
   
@@ -211,6 +251,7 @@ class LPCProcessor(object):
       lpc_data = {'id': i, 'lpc_curve': lpc_curve, 'Xi': lpc.Xi, 'data_range': lpc._dataRange}
       self._writer.writeEvent(i, lpc_data)
       i += 1
+    self._writer.close()
 if __name__ == '__main__':
-  proc = LPCProcessor('../../resources/test.xml')
+  proc = LPCProcessor('../../resources/test_nonscaled.xml')
   proc.runProcessor()

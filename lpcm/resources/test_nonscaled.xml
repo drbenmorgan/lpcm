@@ -1,22 +1,27 @@
+<!--Configuration file, for the lpcProcessing module (for details, see lpcm/resources/test_scaled.xml)
+
+test_nonscaled.xml - typical parameters for running over LAr 0.7Gev muon neutrino CCQE events using unscaled data,
+pickles the output 
+-->
 <lpcProcessor>
 	<Run type="LamuRead">
 		<par type="str" name="filename" value="/home/droythorne/Downloads/muon-proton.root"></par>
 		<par type="int" name="max_events" value="2"></par>
 	</Run>
 	<StartPoints type="lpcMeanShift">
-		<par type="float" name="ms_h" value="0.27"></par>
+		<par type="float" name="ms_h" value="20"></par>
 		<par type="bool" name="automatic_ms_h" value="0"></par>
 		<par type="float" name="ms_sub" value="30"></par>
 		<par type="float" name="rho_threshold" value="0.1"></par>
 	</StartPoints>
 	<Lpc type="LPCImpl">
-		<par type="float" name="h" value="0.02"></par>
-		<par type="float" name="t0" value="0.03"></par>
+		<par type="float" name="h" value="3"></par>
+		<par type="float" name="t0" value="5"></par>
 		<par type="float" name="pen" value="3.0"></par>
 		<par type="int" name="it" value="100"></par>
-		<par type="int" name="mult" value="5"></par>
-		<par type="bool" name="scaled" value="1"></par>
-		<par type="bool" name="cross" value="0"></par>
+		<par type="int" name="mult" value="2"></par>
+		<par type="bool" name="scaled" value=""></par>
+		<par type="bool" name="cross" value=""></par>
 		<par type="float" name="convergence_at" value="0.0001"></par>
 	</Lpc>	
 	<Serialization type="LPCPickler">

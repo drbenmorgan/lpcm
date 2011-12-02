@@ -1,0 +1,51 @@
+<!--Configuration file, for the lpcProcessing module
+
+test_scaled.xml - typical parameters for running over LAr 0.7Gev muon neutrino CCQE events using scaled data (filename in Run
+will need to be adjusted), using the mean shift algorithm top select start points, and dumping the data using python's
+'shelve' package
+
+README
+======
+Instantiates an instance of type 'type' that are responsible for reading events ('Run'), generating start points ('StartPoints'),
+runnning the lpc algorithm ('Lpc') and serializing event output ('Serialization')
+
+Available type are...
+
+element tag	types
+========================================
+Run		LamuRead
+StartPoints	lpcMeanShift, lpcRandomStartPoints
+Lpc		LPCImpl
+Serialization	LPCShelver, LPCPickler
+	
+Each 'par' element specifies a parameter that is passed to the constructor - element attribute 'name' is the constructor's argument 
+name, 'type' is its type, and 'value' is cast to type 'type' before being assigned to variable 'name' in the function call. Note 
+that to achieve a boolean 'False', value should be the empty string, since any non-empty string, s, has bool(s)==True. Usual xml
+escape characters apply to ampersands, quotation marks, ... 
+-->
+<lpcProcessor>
+	<Run type="LamuRead">
+		<par type="str" name="filename" value="/home/droythorne/Downloads/muon-proton.root"></par>
+		<par type="int" name="max_events" value="2"></par>
+	</Run>
+	<StartPoints type="lpcMeanShift">
+		<par type="float" name="ms_h" value="0.27"></par>
+		<par type="bool" name="automatic_ms_h" value="0"></par>
+		<par type="float" name="ms_sub" value="30"></par>
+		<par type="float" name="rho_threshold" value="0.1"></par>
+	</StartPoints>
+	<Lpc type="LPCImpl">
+		<par type="float" name="h" value="0.02"></par>
+		<par type="float" name="t0" value="0.03"></par>
+		<par type="float" name="pen" value="3.0"></par>
+		<par type="int" name="it" value="100"></par>
+		<par type="int" name="mult" value="2"></par>
+		<par type="bool" name="scaled" value="1"></par>
+		<par type="bool" name="cross" value=""></par>
+		<par type="float" name="convergence_at" value="0.0001"></par>
+	</Lpc>	
+	<Serialization type="LPCShelver">
+		<par type="str" name="target_directory" value="/tmp"></par>
+		<par type="str" name="target_filename_prefix" value="muon-proton"></par>
+	</Serialization>
+</lpcProcessor>
