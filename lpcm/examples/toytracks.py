@@ -12,6 +12,7 @@ from mpl_toolkits.mplot3d import axes3d, Axes3D
 from numpy.core.numeric import array
 import cPickle
 import matplotlib.pyplot as plt
+import sys
 
 class LamuEventAccessor():
   '''Moved to lpcProcessing.LamuEventDecorator
@@ -115,7 +116,9 @@ if __name__ == '__main__':
   Example of how to read in a root file containing event with hits, generate lpc_curves for each event, serialise these using cPickle, then 
   read the events back in to plot
   '''
-  proc = LPCProcessor('../resources/test_nonscaled.xml')
+  if len(sys.argv) != 2:
+    raise ValueError, 'Must supply the name of a configuration file'
+  proc = LPCProcessor(sys.argv[1])
   proc.runProcessor()
   metadata_filename = proc.getMetadataFilename()
   lpc_curve_load = toyLPCCurveLoad(metadata_filename)

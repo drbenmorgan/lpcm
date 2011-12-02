@@ -13,6 +13,7 @@ from numpy.ma.core import array
 import cPickle
 import os
 import shelve
+import sys
 
 class LPCParameterParser(object):
   '''
@@ -254,5 +255,7 @@ class LPCProcessor(object):
       i += 1
     self._writer.close()
 if __name__ == '__main__':
-  proc = LPCProcessor('../../resources/test_nonscaled.xml')
+  if len(sys.argv) != 2:
+    raise ValueError, 'Must supply the name of a configuration file'
+  proc = LPCProcessor(sys.argv[1])
   proc.runProcessor()
