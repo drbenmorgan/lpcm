@@ -212,5 +212,5 @@ class LPCProcessor(object):
       self._writer.writeEvent(i, lpc_data)
       i += 1
 if __name__ == '__main__':
-  proc = LPCProcessor('/home/droythorne/Downloads/test.xml')
+  proc = LPCProcessor('../../resources/test.xml')
   proc.runProcessor()
