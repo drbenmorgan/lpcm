@@ -57,9 +57,9 @@ class LPCImpl(PrmDictBase):
           starting point, or in form of a vector, where starting points
           are read in consecutive order from the entries of the vector.
           The starting point has always to be specified on the original
-          data scale, even if ‘scaled=TRUE’. A fixed number of starting
-          points can be enforced through option ‘mult’ in
-          ‘lpc.control’.
+          data scale, even if scaled=TRUE. A fixed number of starting
+          points can be enforced through option mult in
+          lpc.control.
     '''
     mult = self._lpcParameters['mult']
     self.x0 = self._startPointsGenerator(self.Xi, n = mult, x0 = x0)
@@ -319,15 +319,15 @@ class LPCImpl(PrmDictBase):
     start_points_generator: a type callable with a single argument, x0, also implements the function setScaleParameters(h) 
     (see doc for function self.resetScaleParameters)
 
-    h : float, bandwidth. May be either specified as a single number, then
+    h : 1-dim numpy.array, length m or float, bandwidth. May be either specified as a single number, then
         the same bandwidth is used in all dimensions, or as an
         m-dimensional bandwidth vector (where m is the dimension of feature points). 
-        The default setting is 10 percent of the range in each direction. If ‘scaled =TRUE’
-        then the bandwidth has to be specified in fractions of the
+        The default setting is 10 percent of the range in each direction. If scaled =TRUE
+        then, if specified, the bandwidth has to be specified in fractions of the
         data range, e.g. h = [0.2, 0.1, 0.3], rather than absolute values.
 
-    t0 : float, scalar step length. Default setting is ‘t0 = h’ if ‘h’ is a
-        scalar, and ‘t0 = mean(h)’ if ‘h’ is a vector.
+    t0 : float, scalar step length. Default setting is 't0 = h' if 'h' is a
+        scalar, and 't0 = mean(h)' if 'h' is a vector.
 
     depth (NOT USED): int, maximum depth of branches,  restricted to the
         values 1,2 or 3 (The original LPC branch has depth 1.  If,
@@ -363,18 +363,18 @@ class LPCImpl(PrmDictBase):
     convergence_at: this forces the curve to stop if the relative
         difference of parameter values between two centers of mass
         falls below the given threshold.  If set to 0, then the curve
-        will always stop after exactly ‘iter’ iterations.
+        will always stop after exactly "iter" iterations.
   
     mult: integer which enforces a fixed number of starting
         points.  If the number given here is larger than the number
-        of starting points provided at ‘x0’, then the missing points
-        will be set at random (For example, if d=2, ‘mult=3’, and
-        ‘x0=c(58.5, 17.8, 80,20)’, then one gets the starting points
+        of starting points provided at "x0", then the missing points
+        will be set at random (For example, if d=2, mult=3, and
+        x0=c(58.5, 17.8, 80,20), then one gets the starting points
         (58.5, 17.8), (80,20), and a randomly chosen third one.
-        Another example for such a situation is ‘x0=NULL’ with
-        ‘mult=1’, in which one random starting point is chosen). If
+        Another example for such a situation is "x0=NULL" with
+        "mult=1", in which one random starting point is chosen). If
         the number given here is smaller the number of starting
-        points provided at ‘x0’, then only the first ‘mult’ starting
+        points provided at x0, then only the first "mult" starting
         points will be used.
     
     pruning_thresh (NOT USED) : float, used to remove non-dense, depth > 1 branches 
@@ -444,6 +444,13 @@ class LPCImpl(PrmDictBase):
     return curve
     
   def resetScaleParameters(self, h, t0 = None):
+    '''Sets the bandwidth as h and lpc segment length as t0. If t0 is None, t0 is set as mean(h). The scale 
+    parameter for the start points generator is also set to h.
+    Parameters
+    ----------
+    h : 1-dim, length m numpy.array or float where m is the dimension of the feature space
+    t0 : float
+    '''
     self.set_in_dict('h', h, self._lpcParameters)
     self._startPointsGenerator.setScaleParameters(self._lpcParameters['h'])
     if t0 is None:
@@ -451,6 +458,12 @@ class LPCImpl(PrmDictBase):
     self.set_in_dict('t0', t0, self._lpcParameters)
   
   def _rescaleInput(self):
+    '''If scaled == True : sets self._dataRange equal to a 1-dim numpy.array containing the ranges in each of m 
+    feature space dimensions, and divides self.Xi through by these ranges (leaving the data in a 1*1*1 cube); 
+    if the bandwidth, h, is not set, this defaults to 0.1 (i.e. 10% of the range). If scaled == False and h is not set, 
+    h defaults to 10% of the range in each feature space dimension. In both the scaled and not scaled cases,
+    if the segment length, t0, is not set this defaults to mean(h).
+    '''
     scaled = self._lpcParameters['scaled']
     h = self._lpcParameters['h']
     if scaled: 
@@ -460,8 +473,7 @@ class LPCImpl(PrmDictBase):
       self._dataRange = data_range
       self.Xi = self.Xi / self._dataRange
       if h is None:
-        h = 0.1
-        self.resetScaleParameters(h, self._lpcParameters['t0'])  
+        self.resetScaleParameters(0.1, self._lpcParameters['t0'])  
     else:
       if h is None:
         self._dataRange = numpy.max(self.Xi, axis = 0) - numpy.min(self.Xi, axis = 0) #calculate ranges of each dimension
@@ -472,6 +484,8 @@ class LPCImpl(PrmDictBase):
       self._lpcParameters['t0'] = mean(h)  
   
   def setDataPoints(self, X):
+    '''Set the data points self.Xi as X, rescale and adjust bandwidth (h)/segment length (t0) if necessary
+    ''' 
     if X.ndim != 2:
       raise ValueError, 'X must be 2 dimensional'
     d = X.shape[1] 
@@ -484,8 +498,11 @@ class LPCImpl(PrmDictBase):
     ''' Will return the scaled curve if self._lpcParameters['scaled'] = True, to return the curve on the same scale as the originally input data, call getCurve with unscale = True
     Arguments
     ---------
-       x0 : 
-       
+    x0 : 2-dim numpy.array containing #rows equal to number of explicitly defined start points
+    and #columns equal to dimension of the feature space points; seeds for the start points algorithm
+    X : 2-dim numpy.array containing #rows equal to number of data points and #columns equal to dimension 
+    of the feature space points   
+    weights : see self._followxSingleDirection docs
     '''
     
     if X is None:

@@ -38,7 +38,7 @@ class ToyTracks():
     '''Generator of a 3 dimensional array of points from events returned by LamuFileReader hits
     '''
     if max_num_events is None:
-      event_iter =  xrange(5, self._reader.number_of_events())
+      event_iter =  xrange(self._reader.number_of_events())
     else:
       event_iter =  xrange(min(max_num_events, self._reader.number_of_events())) 
     for index in event_iter: 

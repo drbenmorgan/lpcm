@@ -26,9 +26,15 @@ class lpcRandomStartPoints():
   
   def __call__(self, X, n = 10, x0 = None):
     '''
-    n, required number of start points, if  None, defaults ot 10 start points
-    x0, 2-dimensional array containing #rows equal to number of explicitly defined start points and #columns equal to dimension of the data points
-    X, 2-dimensional array containing #rows equal to number of data points and #columns equal to dimension of the data points
+    Parameters
+    ----------
+    n : required number of start points, if  None, defaults ot 10 start points
+    
+    x0 : 2-dimensional numpy.array containing #rows equal to number of explicitly defined start points and #columns equal to 
+    dimension of the feature space points
+    
+    X : 2-dimensional numpy.array containing #rows equal to number of data points and #columns equal to dimension 
+    of the data points
     '''
     self._Xi = X
     if n is None or n == 0:
@@ -61,6 +67,8 @@ class lpcMeanShift(PrmDictBase):
     return isinstance(x, (int, float)) and x > 0
  
   def _removeNonTracklikeClusterCenters(self):
+    '''NOTE : Much of this code is copied from LPCMImpl.followXSingleDirection (factor out?)
+    '''
     labels = self._meanShift.labels_
     labels_unique = unique(labels)
     cluster_centers = self._meanShift.cluster_centers_
@@ -79,20 +87,37 @@ class lpcMeanShift(PrmDictBase):
     pruned_cluster_centers = [cluster_centers[clusters['k']] for clusters in rho_clusters if clusters['rho'] < self._lpcParameters['rho_threshold'] ]
     return array(pruned_cluster_centers)
   
-  def __init__(self, **params): 
+  def __init__(self, **params):
+    '''
+    Parameters
+    ----------
+    
+    ms_h : float, sets the bandwidth of the mean shift algorithm, defaults to None, whereby the algorithm automatically
+    determines the bandwidth
+    
+    automatic_ms_h : bool, if True forces the algorithm to determine its own bandwidth, overrides any ms_h setting
+    
+    ms_sub : float, sets the percentage (0 < ms_sub <= 100) of the data points supplied to self.__call__ that are used to compute the ms seed
+    points
+    
+    rho_threshold : float, ratio of 2nd largest to largest cluster eigenvalues, above which cluster centers are
+    removed from the output
+    ''' 
     super(lpcMeanShift, self).__init__()
-    self._lpcParameters = { 'ms_h': None, 
+    self._lpcParameters = { 'ms_h': None,
+                            'automatic_ms_h': False, 
                             'ms_sub': 30,
                             'rho_threshold': 0.2
                           }
     self._prm_list = [self._lpcParameters] 
     self.user_prm = None #extension of parameter set disallowed
-    self._type_check.update({ 'ms_h': lambda x: (x is None) or lpcMeanShift._positivityCheck(x) or (isinstance(x, list) and all(map(lpcMeanShift._positivityCheck, x)) ) , 
-                              'ms_sub': lambda x: lpcMeanShift._positivityCheck and x < 100,
+    self._type_check.update({ 'ms_h': lambda x: (x is None) or lpcMeanShift._positivityCheck(x) or (isinstance(x, list) and all(map(lpcMeanShift._positivityCheck, x)) ) ,
+                              'automatic_ms_h': (bool,), 
+                              'ms_sub': lambda x: lpcMeanShift._positivityCheck and x <= 100,
                               'rho_threshold': lambda x: lpcMeanShift._positivityCheck and x < 1
                             })
     self.set(**params)
-    if self._lpcParameters['ms_h'] is None:
+    if self._lpcParameters['automatic_ms_h'] or self._lpcParameters['ms_h'] is None :
       self._meanShift = MeanShift()
     else:
       self._meanShift = MeanShift(bandwidth = mean(self._lpcParameters['ms_h']))
@@ -130,18 +155,17 @@ class lpcMeanShift(PrmDictBase):
       return lpcRSP(self._Xi, n = n, x0 = pruned_cluster_centers)
   
   def setScaleParameters(self, ms_h = None):
-    '''This is for initially setting the scale parameters, and only has an effect if self._lpcParamters['ms_h'] is None
-       If ms_h is None, self._lpcParamters['ms_h'] remains as none, and the bandwidth is determined by the ms algorithm
-    '''
-    if self._lpcParameters['ms_h'] is None:
-      if ms_h is None:
-        pass
-        #self.set_in_dict('ms_h', 0.1, self._lpcParameters)
-      else:
-        self.set_in_dict('ms_h', ms_h, self._lpcParameters)  
+    '''This is for initially setting the scale parameters, and only has an effect if 
+    self._lpcParamters['automatic_ms_h'] is False
     
-    bandwidth = mean(self._lpcParameters['ms_h'])
-    self._meanShift = MeanShift(bandwidth = bandwidth)
+    Parameters
+    ----------
+    ms_h : float or None, sets the bandwidth of meanshift algorithm, default (None) has no effect
+    '''
+    if not self._lpcParameters['automatic_ms_h'] and ms_h is not None:
+        self.set_in_dict('ms_h', ms_h, self._lpcParameters)  
+        bandwidth = mean(self._lpcParameters['ms_h'])
+        self._meanShift = MeanShift(bandwidth = bandwidth)
       
   def getClusterLabels(self):
     return self._meanShift.labels_
