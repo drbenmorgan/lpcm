@@ -14,7 +14,7 @@ Available type are...
 element tag	types
 ========================================
 Run		LamuRead
-StartPoints	lpcMeanShift, lpcRandomStartPoints
+StartPoints	lpcMeanShift, lpcRandomStartPoints (SOON!)
 Lpc		LPCImpl
 Serialization	LPCShelver, LPCPickler
 	

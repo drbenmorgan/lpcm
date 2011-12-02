@@ -166,7 +166,7 @@ class LPCBaseWriter(object):
     _metadata_filename = prefix + '_meta.pkl'
     pk_metadata = open(_metadata_filename, 'w')
     cPickle.dump({'lpc_filename': prefix + '.' + suffix, 
-                  'reader_parmeters': reader_parameters, 
+                  'reader_parameters': reader_parameters, 
                   'lpc_parameters': lpc_parameters}, pk_metadata, 0)
     pk_metadata.close()
     return _metadata_filename
@@ -241,7 +241,8 @@ class LPCProcessor(object):
       self._writer = LPCShelver(self._reader, self._lpcAlgorithm, **serialization_parameters['params'])
     else:
       raise ValueError, 'Specified type of serialization is not recognised'  
-  
+  def getMetadataFilename(self):
+    return self._writer._metadata_filename
   def runProcessor(self):
     events = self._reader.getEventGenerator()
     lpc = self._lpcAlgorithm

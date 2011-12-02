@@ -15,11 +15,11 @@ pickles the output
 		<par type="float" name="rho_threshold" value="0.1"></par>
 	</StartPoints>
 	<Lpc type="LPCImpl">
-		<par type="float" name="h" value="3"></par>
+		<par type="float" name="h" value="2"></par>
 		<par type="float" name="t0" value="5"></par>
-		<par type="float" name="pen" value="3.0"></par>
-		<par type="int" name="it" value="100"></par>
-		<par type="int" name="mult" value="2"></par>
+		<par type="float" name="pen" value="5.0"></par>
+		<par type="int" name="it" value="200"></par>
+		<par type="int" name="mult" value="5"></par>
 		<par type="bool" name="scaled" value=""></par>
 		<par type="bool" name="cross" value=""></par>
 		<par type="float" name="convergence_at" value="0.0001"></par>
