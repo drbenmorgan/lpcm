@@ -9,7 +9,7 @@ pickles the output
 		<par type="int" name="max_events" value="2"></par>
 	</Run>
 	<StartPoints type="lpcMeanShift">
-		<par type="float" name="ms_h" value="20"></par>
+		<par type="float" name="ms_h" value="10"></par>
 		<par type="bool" name="automatic_ms_h" value="0"></par>
 		<par type="float" name="ms_sub" value="30"></par>
 		<par type="float" name="rho_threshold" value="0.1"></par>

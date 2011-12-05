@@ -5,7 +5,7 @@ Created on 22 Nov 2011
 '''
 from collections import defaultdict
 from itertools import cycle
-from lpcm.lpcAnalysis import LPCCurvePruner
+from lpcm.lpcAnalysis import LPCCurvePruner, lpcAnalysisPickleReader
 from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
 from lpcm.lpcProcessing import LPCProcessor, LamuRead
 from mpl_toolkits.mplot3d import axes3d, Axes3D
@@ -90,14 +90,14 @@ def LPCPurityCalculator(curves, data_range, voxel_to_pdg_dictionary, tau):
   return pdg_code_frequencies
 
 def toyLPCCurveDump(rootfile, outfile):
-  '''Moved to lpcProcessing.LpcPLPCBaseWriter and erived classes
+  '''Moved to lpcProcessing.LpcPLPCBaseWriter and derived classes
   '''
   pass
 
 class toyLPCCurveLoad():
-  '''Currently only works on pickled data
-  TODO - implement a shelved data version
-  '''
+  '''DEPRACATED - use lpcAnalysisPickleReader
+  Currently only works on pickled data
+  TODO - implement a shelved data version  '''
   def __init__(self, metadata_filename):
     self.metadata_filename = metadata_filename
     f = open(self.metadata_filename, 'rb')
@@ -121,31 +121,27 @@ if __name__ == '__main__':
   proc = LPCProcessor(sys.argv[1])
   proc.runProcessor()
   metadata_filename = proc.getMetadataFilename()
-  lpc_curve_load = toyLPCCurveLoad(metadata_filename)
-  batch_params = lpc_curve_load.batch_parameters['reader_parameters']
-  toy_truth = LamuRead(batch_params['filename'], batch_params['max_events'])
-  truth_gen = toy_truth.getEventGenerator()
+  lpc_loader = lpcAnalysisPickleReader(metadata_filename)
   #toyLPCPlotter(evt_curves['Xi'], evt_curves['lpc_curve'])
   out_data = []
   while 1:
     try:
-      evt = lpc_curve_load.getEvent()
-      truth_evt = truth_gen.next()
+      evt = lpc_loader.getEvent()
       #pprint(truth_evt.getParticlesInVoxelDict())
       #now calcualte the residuals
       
-      residuals_calc = LPCResiduals(evt['Xi'], tube_radius = 3.0)
-      residuals_runner = LPCResidualsRunner(evt['lpc_curve'], residuals_calc)
+      residuals_calc = LPCResiduals(evt[0]['Xi'], tube_radius = 3.0)
+      residuals_runner = LPCResidualsRunner(evt[0]['lpc_curve'], residuals_calc)
       residuals_runner.setTauRange([2.0])
       
       pruner = LPCCurvePruner(residuals_runner, closeness_threshold = 5.0, path_length_threshold = 10.0)
       remaining_curves = pruner.pruneCurves()
-      toyLPCPlotter(evt['Xi'], remaining_curves)
+      toyLPCPlotter(evt[0]['Xi'], remaining_curves)
   
       tau = 2.0
       #muon_proton_hits = truth_evt.getParticleHits([13, 2212])
       #eff = LPCEfficiencyCalculator(remaining_curves, evt['data_range'], muon_proton_hits, tau)
-      voxel_to_pdg_dictionary = truth_evt.getParticlesInVoxelDict()
+      voxel_to_pdg_dictionary = evt[1].getParticlesInVoxelDict()
       pur = LPCPurityCalculator(remaining_curves, evt['data_range'], voxel_to_pdg_dictionary, tau) 
       
       out_data.append({'voxel_dict': voxel_to_pdg_dictionary, 'pur': pur})

@@ -5,10 +5,42 @@ Created on 25 Nov 2011
 '''
 from lpcm.lpc import LPCImpl
 from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
+from lpcm.lpcProcessing import LamuRead
 from numpy.core.numeric import array
 from numpy.ma.core import arange
 from scitools.PrmDictBase import PrmDictBase
+import cPickle
 
+class lpcAnalysisBaseReader(object):
+  def __init__(self, metadata_filename):
+    self.metadata_filename = metadata_filename
+    f = open(self.metadata_filename, 'rb')
+    self.batch_parameters = cPickle.load(f)
+    self.curves_filename = self.batch_parameters['lpc_filename']
+    f.close()
+    self._f = open(self.curves_filename, 'rb')
+    self._truth = LamuRead(self.batch_parameters['reader_parameters']['filename'], self.batch_parameters['reader_parameters']['max_events'])
+  def __del__(self):
+    self._f.close()
+ 
+  
+class lpcAnalysisPickleReader(lpcAnalysisBaseReader):
+  def __init__(self, metadata_filename):
+    lpcAnalysisBaseReader.__init__(self, metadata_filename)
+    self._truth_generator = self._truth.getEventGenerator()
+  
+  def getEvent(self):
+    '''Returns a tuple of (evt_curves, evt_truth), where evt_curves returns the next event from the pickled
+    output of lpcProcessing, and evt_truth is a LamuEventDecorator object. The LamuEventDecorator will 
+    contain the relevant truth data for the loaded pickled event, on the assumption that this object references
+    the unaltered root files, metadata and output from lpcProcessing. 
+    '''  
+    evt_curves = cPickle.load(self._f)
+    evt_truth = self._truth_generator.next()
+    return evt_curves, evt_truth
+
+class lpcAnalysisShelveReader(lpcAnalysisBaseReader):
+  pass
 
 class LPCCurvePruner(PrmDictBase):
     '''
@@ -31,7 +63,8 @@ class LPCCurvePruner(PrmDictBase):
       self.set(**params)
       self._residualsRunner = residuals_runner
       self._residuals = None
-    
+      self._retained_curves = None
+      
     def _calculateAbsoluteScaleDistanceMatrixCurves(self):
       if self._residuals is None:
         self._residuals = self._residualsRunner.calculateResiduals(calc_residuals = False, calc_containment_matrix = False)
@@ -48,7 +81,8 @@ class LPCCurvePruner(PrmDictBase):
         if e[0] < tau and (e[1][0] not in removed_curves) and (e[1][1] not in removed_curves):
           removed_curves.append(e[1][0])
       return removed_curves
-    
+    def getRetainedCurveIndices(self):
+      return self._retained_curves
     def pruneCurves(self):
       curves = self._residualsRunner._lpcCurves
       short_curves = []
@@ -60,9 +94,10 @@ class LPCCurvePruner(PrmDictBase):
       rem_curves = self._calculateAbsoluteScaleDistanceMatrixCurves()
       num_curves = len(self._residualsRunner._lpcCurves)
       remaining_curve_indices = list(set(range(0, num_curves)) - set(rem_curves)) #TODO, betterify this monstrosity
+      self._retained_curves = remaining_curve_indices
       remaining_curves = []
       for i in remaining_curve_indices:
-        remaining_curves.append(self._residualsRunner._lpcCurves[i])
+        remaining_curves.append(self._residualsRunner._lpcCurves[i]) #pretty inefficient to copy this
       return remaining_curves
 
 if __name__ == "__main__":

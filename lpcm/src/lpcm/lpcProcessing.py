@@ -138,6 +138,10 @@ class LamuRead(object):
       event = LamuEventDecorator(self._event_gen.next())
       yield event    
   
+  def getEvent(self, index):
+    event = LamuEventDecorator(self._reader.get_event(index))
+    return event
+  
   def getParameters(self):
     return {'max_events': self.max_events, 'filename': self.filename}
 

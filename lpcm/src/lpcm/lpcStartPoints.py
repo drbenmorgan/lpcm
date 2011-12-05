@@ -28,7 +28,7 @@ class lpcRandomStartPoints():
     '''
     Parameters
     ----------
-    n : required number of start points, if  None, defaults ot 10 start points
+    n : required number of start points, if  None, defaults to 10 start points
     
     x0 : 2-dimensional numpy.array containing #rows equal to number of explicitly defined start points and #columns equal to 
     dimension of the feature space points
@@ -72,7 +72,8 @@ class lpcMeanShift(PrmDictBase):
     labels = self._meanShift.labels_
     labels_unique = unique(labels)
     cluster_centers = self._meanShift.cluster_centers_
-    rho_clusters = []
+    rsp = lpcRandomStartPoints()
+    cluster_representatives = []
     for k in range(len(labels_unique)):
       cluster_members = labels == k
       cluster_center = cluster_centers[k]
@@ -83,9 +84,13 @@ class lpcMeanShift(PrmDictBase):
       sorted_eigen_cov = zip(eigen_cov[0],map(ravel,vsplit(eigen_cov[1].transpose(),len(eigen_cov[1]))))
       sorted_eigen_cov.sort(key = lambda elt: elt[0], reverse = True)   
       rho = sorted_eigen_cov[1][0] / sorted_eigen_cov[0][0] #Ratio of two largest eigenvalues   
-      rho_clusters.append({'k': k, 'rho': rho})
-    pruned_cluster_centers = [cluster_centers[clusters['k']] for clusters in rho_clusters if clusters['rho'] < self._lpcParameters['rho_threshold'] ]
-    return array(pruned_cluster_centers)
+      if rho < self._lpcParameters['rho_threshold']:
+        cluster_representatives.append(cluster_center)
+      else: #append a random element of the cluster
+        random_cluster_element = rsp(cluster, 1)[0]
+        cluster_representatives.append(random_cluster_element)
+    
+    return array(cluster_representatives)
   
   def __init__(self, **params):
     '''
@@ -145,14 +150,14 @@ class lpcMeanShift(PrmDictBase):
     self._meanShift.seeds = ms_seeds
     self._meanShift.fit(self._Xi)
     
-    pruned_cluster_centers = self._removeNonTracklikeClusterCenters()
-    if len(pruned_cluster_centers) == 0:
-      pruned_cluster_centers = None
+    cluster_respresentatives = self._removeNonTracklikeClusterCenters()
+    if len(cluster_respresentatives) == 0:
+      cluster_respresentatives = None
     lpcRSP = lpcRandomStartPoints()
     if n is None:
-      return lpcRSP(self._Xi, n = 2, x0 = pruned_cluster_centers)
+      return lpcRSP(self._Xi, n = 2, x0 = cluster_respresentatives)
     else:
-      return lpcRSP(self._Xi, n = n, x0 = pruned_cluster_centers)
+      return lpcRSP(self._Xi, n = n, x0 = cluster_respresentatives)
   
   def setScaleParameters(self, ms_h = None):
     '''This is for initially setting the scale parameters, and only has an effect if 
