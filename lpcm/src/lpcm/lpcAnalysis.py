@@ -146,7 +146,7 @@ class lpcAnalyser(object):
     self._initResiduals()
     self._initPruner()
     self._setOutputFilename()
-    
+    self._initPurity()
   def _initReader(self):
     run_parameters = self._parser.getReadParameters()
     if run_parameters['type'] == 'lpcAnalysisPickleReader':
@@ -171,6 +171,9 @@ class lpcAnalyser(object):
     misc = self._parser.getMiscParameters()
     self._output_filename = misc['params']['output_filename']
   
+  def _initPurity(self):
+    self._purity = LPCPurityCalculator(self._residuals_runner)
+  
   def runAnalyser(self):
     out_data = []
     while 1:
@@ -181,11 +184,9 @@ class lpcAnalyser(object):
         self._residuals_runner.calculateResiduals(calc_residuals = False, calc_containment_matrix = False)
         remaining_curves = self._pruner.pruneCurves()
         #muon_proton_hits = truth_evt.getParticleHits([13, 2212])
-        #eff = LPCEfficiencyCalculator(remaining_curves, evt['data_range'], muon_proton_hits, tau)
+        #eff = LPCEfficiencyCalculator(remaining_curves, evt['data_range'], muon_proton_hits, tau) TODO - move from examples/toytracks 
         voxel_to_pdg_dictionary = evt[1].getParticlesInVoxelDict()
-        #TODO - move purity calculator out of toytracks
-        purity_calculator = LPCPurityCalculator(self._residuals_runner)
-        pur = purity_calculator.calculatePurity(remaining_curves, evt[0]['data_range'], voxel_to_pdg_dictionary) 
+        pur = self._purity.calculatePurity(remaining_curves, evt[0]['data_range'], voxel_to_pdg_dictionary) 
         out_data.append({'voxel_dict': voxel_to_pdg_dictionary, 'pur': pur})
       except EOFError:
         break

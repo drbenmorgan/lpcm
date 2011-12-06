@@ -171,8 +171,15 @@ class LPCResiduals(PrmDictBase):
       skip_l2 = ((len(l2_curve) - 2) / max_segments) + 1
     
     l2_subset = range(0, len(l2_curve), skip_l2)
+    #if index of the last point of l2_curve is not included, add it
+    if l2_subset[-1] != len(l2_curve) - 1:
+      l2_subset.append(len(l2_curve) - 1)
     l2_curve = l2_curve[l2_subset]
-    for i in range(0, len(l1_curve) - 1, skip_l1):
+    l1_range = range(0, len(l1_curve) - 1, skip_l1)
+    #if index of the last point of l1_curve is not included, add it
+    if l1_range[-1] != len(l1_curve) - 1:
+      l1_range.append(len(l1_curve) - 1)
+    for i in l1_range:
       lamb = l1_lamb[i+1] - l1_lamb[i]
       min_d = self._distancePointToLineSegment(l2_curve[0], l2_curve[1], l1_curve[i])[0]
       for j in range(1, len(l2_curve) - 1):
