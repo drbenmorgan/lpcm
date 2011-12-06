@@ -22,8 +22,7 @@ class lpcAnalysisBaseReader(object):
     self._truth = LamuRead(self.batch_parameters['reader_parameters']['filename'], self.batch_parameters['reader_parameters']['max_events'])
   def __del__(self):
     self._f.close()
- 
-  
+
 class lpcAnalysisPickleReader(lpcAnalysisBaseReader):
   def __init__(self, metadata_filename):
     lpcAnalysisBaseReader.__init__(self, metadata_filename)
