@@ -41,19 +41,20 @@ class LPCResidualsRunner():
     if calc_residuals == True:
       if self._tauRange is None:
         raise ValueError, 'tauRange, the list of cylinder radii, has not yet been defined'
-      curve_residuals = self._calculateCurveResiduals(curves)  
+      curve_residuals = self._calculateCurveResiduals()  
     if calc_containment_matrix == True:
       containment_matrices = {}
       for tau in self._tauRange:
         containment_matrix = self._calculateHitContainmentMatrix(curve_residuals, tau)
         containment_matrices[tau] = containment_matrix
     if calc_distance_matrix == True:
-      distance_matrix = self._calculateCurveDistanceMatrix(curves)
+      distance_matrix = self._calculateCurveDistanceMatrix()
     
     residuals = {'curve_residuals': curve_residuals, 'distance_matrix': distance_matrix, 'containment_matrices': containment_matrices}
     return residuals    
  
-  def _calculateCurveResiduals(self, curves):
+  def _calculateCurveResiduals(self):
+    curves = self._lpcCurves
     curve_residuals = []
     for curve in curves:
             tube_residuals = self._lpcResiduals.getTubeResiduals(curve)
@@ -65,7 +66,8 @@ class LPCResidualsRunner():
             curve_residuals.append({'tube_residuals': tube_residuals, 'path_residuals': path_residuals, 'coverage_indices': coverage_indices})
     return curve_residuals
           
-  def _calculateCurveDistanceMatrix(self, curves):
+  def _calculateCurveDistanceMatrix(self):
+    curves = self._lpcCurves
     num_curves = len(curves)
     distance_matrix = zeros((num_curves, num_curves))
     for i in range(num_curves):
@@ -190,7 +192,7 @@ class LPCResiduals(PrmDictBase):
       raise ValueError, 'There must be at least 1 data point'
     self._X = X
     self._treeX = KDTree(X)
-  def __init__(self, X, **params):
+  def __init__(self, X = None, **params):
     '''
     Constructor
     '''
@@ -206,7 +208,8 @@ class LPCResiduals(PrmDictBase):
                               'eps': lambda x: isinstance(x, (int,float)) and x > 0
                             })
     self.set(**params)
-    self.setDataPoints(X)
+    if X is not None:
+      self.setDataPoints(X)
     self._maxSegmentLength = None
   
   def calculateCoverageIndices(self, curves, tau):  

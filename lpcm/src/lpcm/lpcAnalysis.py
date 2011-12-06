@@ -11,9 +11,14 @@ from numpy.ma.core import arange
 from scitools.PrmDictBase import PrmDictBase
 import cPickle
 
+class lpcAnalysisParser(object):
+  pass
 class lpcAnalysisBaseReader(object):
-  def __init__(self, metadata_filename):
+  def __init__(self, metadata_filename, max_events):
+    '''NB max_events actually has no influence on the operation of the class for the moment
+    '''
     self.metadata_filename = metadata_filename
+    self._max_events = max_events
     f = open(self.metadata_filename, 'rb')
     self.batch_parameters = cPickle.load(f)
     self.curves_filename = self.batch_parameters['lpc_filename']
@@ -24,8 +29,8 @@ class lpcAnalysisBaseReader(object):
     self._f.close()
 
 class lpcAnalysisPickleReader(lpcAnalysisBaseReader):
-  def __init__(self, metadata_filename):
-    lpcAnalysisBaseReader.__init__(self, metadata_filename)
+  def __init__(self, metadata_filename, max_events = None):
+    lpcAnalysisBaseReader.__init__(self, metadata_filename, max_events)
     self._truth_generator = self._truth.getEventGenerator()
   
   def getEvent(self):
@@ -41,7 +46,7 @@ class lpcAnalysisPickleReader(lpcAnalysisBaseReader):
 class lpcAnalysisShelveReader(lpcAnalysisBaseReader):
   pass
 
-class LPCCurvePruner(PrmDictBase):
+class lpcCurvePruner(PrmDictBase):
     '''
     Helper functions for using lpc curves and their residuals to prune similar curves from lpc output. Answers the question, 'When
     are two lpc curves the same?'
@@ -50,7 +55,7 @@ class LPCCurvePruner(PrmDictBase):
       '''
       Constructor
       '''
-      super(LPCCurvePruner, self).__init__()
+      super(lpcCurvePruner, self).__init__()
       self._params = {  'closeness_threshold': 0.1, #how close before the curve is thrown away 
                         'path_length_threshold': 0.05 #reject all curves with path length less than this
                      }
@@ -99,9 +104,65 @@ class LPCCurvePruner(PrmDictBase):
         remaining_curves.append(self._residualsRunner._lpcCurves[i]) #pretty inefficient to copy this
       return remaining_curves
 
+class lpcAnalyser(object):
+  def __init__(self, filename):
+    '''
+    Constructor
+    '''
+    self._parser = lpcAnalysisParser(filename)
+    self._initReader()
+  def _initReader(self):
+    run_parameters = self._parser.getReadParameters()
+    if run_parameters['type'] == 'lpcAnalysisPickleReader':
+      self._reader = lpcAnalysisPickleReader(**run_parameters['params'])
+    else:
+      raise ValueError, 'Specified type of reader is not recognised'
+  def _initResiduals(self):
+    residual_parameters = self._parser.getResidualsParameters()
+    if residual_parameters['type'] == 'LPCResiduals':
+      self._residuals = LPCResiduals(**residual_parameters['params'])
+    else:
+      raise ValueError, 'Specified type of residuals calculator is not recognised'
+  def runAnalyser(self):
+    out_data = []
+    while 1:
+      try:
+        evt = self._reader.getEvent()
+        #pprint(truth_evt.getParticlesInVoxelDict())
+        #now calcualte the residuals
+        self._residuals.setDataPoints(evt[0]['Xi'])
+        residuals_runner = LPCResidualsRunner(evt[0]['lpc_curve'], residuals_calc)
+        residuals_runner.setTauRange([2.0])
+        
+        pruner = lpcCurvePruner(residuals_runner, closeness_threshold = 5.0, path_length_threshold = 10.0)
+        remaining_curves = pruner.pruneCurves()
+        tau = 2.0
+        #muon_proton_hits = truth_evt.getParticleHits([13, 2212])
+        #eff = LPCEfficiencyCalculator(remaining_curves, evt['data_range'], muon_proton_hits, tau)
+        voxel_to_pdg_dictionary = evt[1].getParticlesInVoxelDict()
+        pur = LPCPurityCalculator(remaining_curves, evt[0]['data_range'], voxel_to_pdg_dictionary, tau) 
+        
+        out_data.append({'voxel_dict': voxel_to_pdg_dictionary, 'pur': pur})
+        print 'breakpoint'
+      except EOFError:
+        break
+      
+    outfile = open('/tmp/purity_data.pkl', 'w')
+    cPickle.dump(out_data, outfile, -1)
+      
+    
+    events = self._reader.getEventGenerator()
+    lpc = self._lpcAlgorithm
+    i = 0
+    for event in events:
+      lpc_curve = lpc.lpc(X=event.getEventHits())
+      lpc_data = {'id': i, 'lpc_curve': lpc_curve, 'Xi': lpc.Xi, 'data_range': lpc._dataRange}
+      self._writer.writeEvent(i, lpc_data)
+      i += 1
+    self._writer.close()
 if __name__ == "__main__":
   '''Just a quick test of calculateAbsoluteScaleDistanceMatrixCurves for now. All the gumpf beforehand is
-  redundant to the test, just creating a chain of objects to instantiate the LPCCurvePruner instance
+  redundant to the test, just creating a chain of objects to instantiate the lpcCurvePruner instance
   '''
   t =  arange(-1,1,0.1)
   line = array(zip(t,t,t))
@@ -109,7 +170,7 @@ if __name__ == "__main__":
   lpc_curve = lpc.lpc(X=line)
   residuals_calc = LPCResiduals(line, tube_radius = 0.15)
   residuals_runner = LPCResidualsRunner(lpc.getCurve(), residuals_calc)
-  analysis = LPCCurvePruner(residuals_runner)   
+  analysis = lpcCurvePruner(residuals_runner)   
   a = array([[ 0.,          0.00058024,  0.00078112,  0.22710005,  0.22702893],
              [ 0.00063906,  0.,          0.00029174,  0.22873423,  0.2286578 ],
              [ 0.00075869,  0.00030338,  0.,          0.23164868,  0.23158872],

@@ -4,70 +4,16 @@ Created on 1 Dec 2011
 @author: droythorne
 Classes for reading ROOT files, running the lpc algorithm and serialising the initial lpc output
 '''
-from elementtree.ElementTree import ElementTree
 from latte.io_formats.decorators import LamuRun
 from latte.spatial.dok import dok
 from lpcm.lpc import LPCImpl
+from lpcm.lpcParser import lpcProcessingParser
 from lpcm.lpcStartPoints import lpcMeanShift
 from numpy.ma.core import array
 import cPickle
 import os
 import shelve
 import sys
-
-class LPCParameterParser(object):
-  '''
-  Returns dictionary with keys 'type' and 'params'
-  '''
-  def __init__(self, filename):
-    '''
-    Parameters
-    ----------
-    filename : path to xml config file (TODO - SCHEMA definition)
-    '''
-    self._filename = filename
-    self._config_tree = ElementTree(file = filename)
-  
-  def _generateParamDictionary(self, tag):
-    '''Generates a dictionary containing 'type', a string defining the 'type' attribute of element 'tag'
-    and 'params', a dictionary of parameters to be unpacked as arguments to constructors for instances of 'type'
-    '''
-    type_node = self._config_tree.getiterator(tag)
-    if len(type_node) == 1:
-      type = type_node[0].get('type')
-      params = {}
-      for par in type_node[0]:  
-        items = dict(par.items())
-        s = 'v=' + items['type'] + '("' + items['value'] + '")' 
-        exec(s) #TODO - remove exec, there are clearly better ways to do this!
-        params[items['name']] = v
-      return {'type': type, 'params': params}
-    else:
-      msg = 'The required lpc configuration element tag, ' + tag + ' is missing from ' + self._filename
-      raise ValueError, msg
-  
-  def getRunParameters(self):
-    '''Gets the filename of event file, type that reads it in and, if present, max number of 
-    events to process (set as None if absent)
-    'max_events', 'type', 'filename'
-    '''
-    d = self._generateParamDictionary('Run')
-    return d
-  def getStartPointsParameters(self):
-    '''Return a dictionary containing the type name and constructor parameters for the start points generator
-    'type'
-    '''
-    d = self._generateParamDictionary('StartPoints')
-    return d
-  def getLpcParameters(self):
-    '''Parameters for the LPCImpl constructor
-    '''
-    d = self._generateParamDictionary('Lpc')
-    return d
-  def getSerialisationParameters(self):
-    '''Parameters that govern the output directory, filename prefix, content?...'''
-    d = self._generateParamDictionary('Serialization')
-    return d
 
 class LamuEventDecorator(object):
   '''
@@ -203,7 +149,7 @@ class LPCShelver(LPCBaseWriter):
   def writeEvent(self, event_id, event):
     self._lpc_data[str(event_id)] = event
 
-class LPCProcessor(object):
+class lpcProcessor(object):
   '''
   Class that processes events (reads parameters from filename, runs the lpc algorithm, then serialises the output 
   '''
@@ -211,7 +157,7 @@ class LPCProcessor(object):
     '''
     Constructor
     '''
-    self._parser = LPCParameterParser(filename)
+    self._parser = lpcProcessingParser(filename)
     self._initReader()
     self._initStartPoints()
     self._initLpc()
@@ -261,5 +207,5 @@ class LPCProcessor(object):
 if __name__ == '__main__':
   if len(sys.argv) != 2:
     raise ValueError, 'Must supply the name of a configuration file'
-  proc = LPCProcessor(sys.argv[1])
+  proc = lpcProcessor(sys.argv[1])
   proc.runProcessor()

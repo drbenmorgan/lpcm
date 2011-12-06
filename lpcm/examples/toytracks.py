@@ -5,9 +5,9 @@ Created on 22 Nov 2011
 '''
 from collections import defaultdict
 from itertools import cycle
-from lpcm.lpcAnalysis import LPCCurvePruner, lpcAnalysisPickleReader
+from lpcm.lpcAnalysis import lpcCurvePruner, lpcAnalysisPickleReader
 from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
-from lpcm.lpcProcessing import LPCProcessor, LamuRead
+from lpcm.lpcProcessing import LamuRead, lpcProcessor
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 from numpy.core.numeric import array
 import cPickle
@@ -118,7 +118,7 @@ if __name__ == '__main__':
   '''
   if len(sys.argv) != 2:
     raise ValueError, 'Must supply the name of a configuration file'
-  proc = LPCProcessor(sys.argv[1])
+  proc = lpcProcessor(sys.argv[1])
   proc.runProcessor()
   metadata_filename = proc.getMetadataFilename()
   lpc_loader = lpcAnalysisPickleReader(metadata_filename)
@@ -133,13 +133,13 @@ if __name__ == '__main__':
       residuals_runner = LPCResidualsRunner(evt[0]['lpc_curve'], residuals_calc)
       residuals_runner.setTauRange([2.0])
       
-      pruner = LPCCurvePruner(residuals_runner, closeness_threshold = 5.0, path_length_threshold = 10.0)
+      pruner = lpcCurvePruner(residuals_runner, closeness_threshold = 5.0, path_length_threshold = 10.0)
       remaining_curves = pruner.pruneCurves()
       tau = 2.0
       #muon_proton_hits = truth_evt.getParticleHits([13, 2212])
       #eff = LPCEfficiencyCalculator(remaining_curves, evt['data_range'], muon_proton_hits, tau)
       voxel_to_pdg_dictionary = evt[1].getParticlesInVoxelDict()
-      pur = LPCPurityCalculator(remaining_curves, evt['data_range'], voxel_to_pdg_dictionary, tau) 
+      pur = LPCPurityCalculator(remaining_curves, evt[0]['data_range'], voxel_to_pdg_dictionary, tau) 
       
       out_data.append({'voxel_dict': voxel_to_pdg_dictionary, 'pur': pur})
       print 'breakpoint'

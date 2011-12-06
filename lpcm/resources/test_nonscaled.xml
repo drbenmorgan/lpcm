@@ -3,7 +3,7 @@
 test_nonscaled.xml - typical parameters for running over LAr 0.7Gev muon neutrino CCQE events using unscaled data,
 pickles the output 
 -->
-<lpcProcessor>
+<lpcProcessing>
 	<Run type="LamuRead">
 		<par type="str" name="filename" value="/home/droythorne/Downloads/muon-proton.root"></par>
 		<par type="int" name="max_events" value="2"></par>
@@ -28,4 +28,4 @@ pickles the output
 		<par type="str" name="target_directory" value="/tmp"></par>
 		<par type="str" name="target_filename_prefix" value="muon-proton"></par>
 	</Serialization>
-</lpcProcessor>
+</lpcProcessing>

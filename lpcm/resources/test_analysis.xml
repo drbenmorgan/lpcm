@@ -1,0 +1,36 @@
+<!--Configuration file, for the lpcAnalysis module
+
+test_analysis.xml - typical parameters for running over the output of the lpcProcessing for
+LAr 0.7Gev muon neutrino CCQE events using scaled data which is then pickled), dumps data using
+a pickle
+
+README
+======
+Instantiates an instance of type 'type' that are responsible for reading events ('Read'), running curve residuals ('Residuals'),
+pruning ('Prune'), and serializing event output ('Serialization')
+
+Available type are...
+
+element       tag	types
+========================================
+Read		      lpcAnalysisPickleReader, lpcAnalysisShelveReader (SOON!)
+Residuals     lpcResidualsRunner
+Prune         lpcCurvePruner
+Serialization	(TODO!)
+	
+Each 'par' element specifies a parameter that is passed to the constructor - element attribute 'name' is the constructor's argument 
+name, 'type' is its type, and 'value' is cast to type 'type' before being assigned to variable 'name' in the function call. Note 
+that to achieve a boolean 'False', value should be the empty string, since any non-empty string, s, has bool(s)==True. Usual xml
+escape characters apply to ampersands, quotation marks, ... 
+-->
+<lpcAnalysis>
+	<Read type="lpcAnalysisPickleReader">
+		<par type="str" name="metadata_filename" value="/home/droythorne/git/physics/lpcm/lpcm/resources/muon-proton_blahblah_metadata.pkl"></par>
+		<par type="int" name="max_events" value="2"></par>
+	</Read>
+	<Residuals type="LPCResiduals">
+	   <par type="int" name="k" value="20"></par>
+	   <par type="float" name="tube_radius" value="3.0"></par>
+     <par type="float" name="eps" value="0.0"></par>           
+  </Residuals>
+</lpcAnalysis>

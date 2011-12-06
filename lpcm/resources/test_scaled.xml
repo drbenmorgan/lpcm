@@ -23,7 +23,7 @@ name, 'type' is its type, and 'value' is cast to type 'type' before being assign
 that to achieve a boolean 'False', value should be the empty string, since any non-empty string, s, has bool(s)==True. Usual xml
 escape characters apply to ampersands, quotation marks, ... 
 -->
-<lpcProcessor>
+<lpcProcessing>
 	<Run type="LamuRead">
 		<par type="str" name="filename" value="/home/droythorne/Downloads/muon-proton.root"></par>
 		<par type="int" name="max_events" value="2"></par>
@@ -48,4 +48,4 @@ escape characters apply to ampersands, quotation marks, ...
 		<par type="str" name="target_directory" value="/tmp"></par>
 		<par type="str" name="target_filename_prefix" value="muon-proton"></par>
 	</Serialization>
-</lpcProcessor>
+</lpcProcessing>
