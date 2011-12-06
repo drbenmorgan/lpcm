@@ -129,15 +129,12 @@ if __name__ == '__main__':
       evt = lpc_loader.getEvent()
       #pprint(truth_evt.getParticlesInVoxelDict())
       #now calcualte the residuals
-      
       residuals_calc = LPCResiduals(evt[0]['Xi'], tube_radius = 3.0)
       residuals_runner = LPCResidualsRunner(evt[0]['lpc_curve'], residuals_calc)
       residuals_runner.setTauRange([2.0])
       
       pruner = LPCCurvePruner(residuals_runner, closeness_threshold = 5.0, path_length_threshold = 10.0)
       remaining_curves = pruner.pruneCurves()
-      toyLPCPlotter(evt[0]['Xi'], remaining_curves)
-  
       tau = 2.0
       #muon_proton_hits = truth_evt.getParticleHits([13, 2212])
       #eff = LPCEfficiencyCalculator(remaining_curves, evt['data_range'], muon_proton_hits, tau)
