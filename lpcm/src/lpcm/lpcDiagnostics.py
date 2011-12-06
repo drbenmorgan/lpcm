@@ -17,17 +17,33 @@ class LPCResidualsRunner():
   in cylinder m contained in cylinder n (i.e. the degree of overlap in the hits associated to each path, used later to prune the result set
   by removing or concatenating curves 
   '''
-  def __init__(self, lpc_curves, lpc_residuals):
-    self._lpcCurves = lpc_curves
+  def __init__(self, lpc_residuals):
     self._lpcResiduals = lpc_residuals
     self._tauRange = None
+    self._residuals = None
+  
+  def setLpcCurves(self, lpc_curves):
+    self._lpcCurves = lpc_curves
+    self._residuals = None
+  
+  def setDataPoints(self, Xi):
+    self._lpcResiduals.setDataPoints(Xi)  
+    self._residuals = None
+    
+  def getResiduals(self):
+    if self._residuals is None:
+      raise ValueError, 'Residuals have not yet been calculated'
+    else:
+      return self._residuals
   
   def setTauRange(self,tau_range):
     '''
     tau_range, 1d list of floats , each defining the radius of the cylinder around lpc curves used to associate self._lpcAlgorithm.Xi points to curves
     '''   
     self._tauRange = tau_range
-
+  def getTauRange(self):
+    return self._tauRange
+  
   def calculateResiduals(self, calc_residuals = True, calc_distance_matrix = True, calc_containment_matrix = True):  
     
     if calc_containment_matrix == True and calc_residuals == False:
@@ -50,8 +66,8 @@ class LPCResidualsRunner():
     if calc_distance_matrix == True:
       distance_matrix = self._calculateCurveDistanceMatrix()
     
-    residuals = {'curve_residuals': curve_residuals, 'distance_matrix': distance_matrix, 'containment_matrices': containment_matrices}
-    return residuals    
+    self._residuals = {'curve_residuals': curve_residuals, 'distance_matrix': distance_matrix, 'containment_matrices': containment_matrices}
+        
  
   def _calculateCurveResiduals(self):
     curves = self._lpcCurves
@@ -199,13 +215,13 @@ class LPCResiduals(PrmDictBase):
     super(LPCResiduals, self).__init__()
     self._params = {  'k': 20, 
                       'tube_radius': 0.2,
-                      'eps': 0.0 
+                      'eps': 0.0 #
                    }
     self._prm_list = [self._params] 
     self.user_prm = None #extension of parameter set disallowed
     self._type_check.update({ 'k': lambda x: isinstance(x, int) and x > 0, 
                               'tube_radius': lambda x: isinstance(x, (int,float)) and x > 0,
-                              'eps': lambda x: isinstance(x, (int,float)) and x > 0
+                              'eps': lambda x: isinstance(x, (int,float)) and x >= 0
                             })
     self.set(**params)
     if X is not None:

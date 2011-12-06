@@ -97,7 +97,7 @@ class LPCBaseWriter(object):
   serializable event data as second
   '''
   def __init__(self, reader, lpc_algorithm, target_directory, target_filename_prefix):
-    lpc_parameters = lpc_algorithm._lpcParameters
+    lpc_parameters = lpc_algorithm._lpcParameters #use one of the PrmDictBase member functions instead 
     reader_parameters = reader.getParameters()
     param_hash = hash(str((lpc_parameters, reader_parameters)))
     prefix = os.path.join(target_directory, target_filename_prefix + '_' + str(param_hash))

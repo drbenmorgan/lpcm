@@ -3,16 +3,16 @@ Created on 25 Nov 2011
 
 @author: droythorne
 '''
+from collections import defaultdict
 from lpcm.lpc import LPCImpl
 from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
+from lpcm.lpcParser import lpcAnalysisParser
 from lpcm.lpcProcessing import LamuRead
 from numpy.core.numeric import array
 from numpy.ma.core import arange
 from scitools.PrmDictBase import PrmDictBase
 import cPickle
 
-class lpcAnalysisParser(object):
-  pass
 class lpcAnalysisBaseReader(object):
   def __init__(self, metadata_filename, max_events):
     '''NB max_events actually has no influence on the operation of the class for the moment
@@ -71,7 +71,7 @@ class lpcCurvePruner(PrmDictBase):
       
     def _calculateAbsoluteScaleDistanceMatrixCurves(self):
       if self._residuals is None:
-        self._residuals = self._residualsRunner.calculateResiduals(calc_residuals = False, calc_containment_matrix = False)
+        self._residuals = self._residualsRunner.getResiduals()
       dm = self._residuals['distance_matrix']
       dm_list = []
       for i in range(dm.shape[0]):
@@ -104,6 +104,38 @@ class lpcCurvePruner(PrmDictBase):
         remaining_curves.append(self._residualsRunner._lpcCurves[i]) #pretty inefficient to copy this
       return remaining_curves
 
+class LPCPurityCalculator(object):
+  '''Calcualtes purity by event for each curve and for each value in tau_range. SHould be initialised with LPCDiagnostics.LPCResidualsRunner
+  instance'''
+  def __init__(self, residuals_runner):
+    self._residuals_runner = residuals_runner
+    
+  def calculatePurity(self, curves, data_range, voxel_to_pdg_dictionary):
+    '''NB - self._residuals_runner should have had calculateResiduals method called with calc_residuals = True beofre calling this method
+    '''
+    hit_tuples = voxel_to_pdg_dictionary.keys()
+    if data_range is None:
+      data_range = 1.0
+    #rescales the truth data if necessary
+    hits = array([[h[0], h[1], h[2]] for h in hit_tuples]) / data_range
+    self._residuals_runner.setDataPoints(hits)
+    self._residuals_runner.setLpcCurves(curves)
+    self._residuals_runner.calculateResiduals(True, False, False)
+    residuals = self._residuals_runner.getResiduals()
+    tau_range = self._residuals_runner.getTauRange()
+    purity = {}
+    for tau in tau_range:
+      pdg_code_frequencies = []
+      for i in range(len(curves)):
+        d = defaultdict(int)
+        hit_labels = [voxel_to_pdg_dictionary[hit_tuples[i]] for i in residuals['curve_residuals'][i]['coverage_indices'][tau]]
+        flattened_hit_labels = [pdg_code for pdg_code_list in hit_labels for pdg_code in pdg_code_list]
+        for pdg_code in flattened_hit_labels:
+          d[pdg_code] += 1
+        pdg_code_frequencies.append(d)
+      purity[tau] = pdg_code_frequencies
+    return purity
+
 class lpcAnalyser(object):
   def __init__(self, filename):
     '''
@@ -111,6 +143,10 @@ class lpcAnalyser(object):
     '''
     self._parser = lpcAnalysisParser(filename)
     self._initReader()
+    self._initResiduals()
+    self._initPruner()
+    self._setOutputFilename()
+    
   def _initReader(self):
     run_parameters = self._parser.getReadParameters()
     if run_parameters['type'] == 'lpcAnalysisPickleReader':
@@ -121,55 +157,60 @@ class lpcAnalyser(object):
     residual_parameters = self._parser.getResidualsParameters()
     if residual_parameters['type'] == 'LPCResiduals':
       self._residuals = LPCResiduals(**residual_parameters['params'])
+      self._residuals_runner = LPCResidualsRunner(self._residuals)
+      self._residuals_runner.setTauRange([2.0]) #TODO - parameterise this in config file
     else:
       raise ValueError, 'Specified type of residuals calculator is not recognised'
+  def _initPruner(self):
+    pruner_parameters = self._parser.getPrunerParameters()
+    if pruner_parameters['type'] == 'lpcCurvePruner':
+      self._pruner = lpcCurvePruner(self._residuals_runner, **pruner_parameters['params'])
+    else:
+      raise ValueError, 'Specified type of residuals calculator is not recognised'
+  def _setOutputFilename(self):
+    misc = self._parser.getMiscParameters()
+    self._output_filename = misc['params']['output_filename']
+  
   def runAnalyser(self):
     out_data = []
     while 1:
       try:
         evt = self._reader.getEvent()
-        #pprint(truth_evt.getParticlesInVoxelDict())
-        #now calcualte the residuals
         self._residuals.setDataPoints(evt[0]['Xi'])
-        residuals_runner = LPCResidualsRunner(evt[0]['lpc_curve'], residuals_calc)
-        residuals_runner.setTauRange([2.0])
-        
-        pruner = lpcCurvePruner(residuals_runner, closeness_threshold = 5.0, path_length_threshold = 10.0)
-        remaining_curves = pruner.pruneCurves()
-        tau = 2.0
+        self._residuals_runner.setLpcCurves(evt[0]['lpc_curve'])
+        self._residuals_runner.calculateResiduals(calc_residuals = False, calc_containment_matrix = False)
+        remaining_curves = self._pruner.pruneCurves()
         #muon_proton_hits = truth_evt.getParticleHits([13, 2212])
         #eff = LPCEfficiencyCalculator(remaining_curves, evt['data_range'], muon_proton_hits, tau)
         voxel_to_pdg_dictionary = evt[1].getParticlesInVoxelDict()
-        pur = LPCPurityCalculator(remaining_curves, evt[0]['data_range'], voxel_to_pdg_dictionary, tau) 
-        
+        #TODO - move purity calculator out of toytracks
+        purity_calculator = LPCPurityCalculator(self._residuals_runner)
+        pur = purity_calculator.calculatePurity(remaining_curves, evt[0]['data_range'], voxel_to_pdg_dictionary) 
         out_data.append({'voxel_dict': voxel_to_pdg_dictionary, 'pur': pur})
-        print 'breakpoint'
       except EOFError:
         break
       
-    outfile = open('/tmp/purity_data.pkl', 'w')
+    outfile = open(self._output_filename, 'w')
     cPickle.dump(out_data, outfile, -1)
-      
-    
-    events = self._reader.getEventGenerator()
-    lpc = self._lpcAlgorithm
-    i = 0
-    for event in events:
-      lpc_curve = lpc.lpc(X=event.getEventHits())
-      lpc_data = {'id': i, 'lpc_curve': lpc_curve, 'Xi': lpc.Xi, 'data_range': lpc._dataRange}
-      self._writer.writeEvent(i, lpc_data)
-      i += 1
-    self._writer.close()
+
 if __name__ == "__main__":
-  '''Just a quick test of calculateAbsoluteScaleDistanceMatrixCurves for now. All the gumpf beforehand is
-  redundant to the test, just creating a chain of objects to instantiate the lpcCurvePruner instance
+  analyser = lpcAnalyser('../../resources/test_analysis.xml')
+  analyser.runAnalyser()
+  print 'Done!'
+  
   '''
+  TODO - stick this into a unit test
+  Just a quick test of calculateAbsoluteScaleDistanceMatrixCurves for now. All the gumpf beforehand is
+  redundant to the test, just creating a chain of objects to instantiate the lpcCurvePruner instance
+  
   t =  arange(-1,1,0.1)
   line = array(zip(t,t,t))
   lpc = LPCImpl()
   lpc_curve = lpc.lpc(X=line)
-  residuals_calc = LPCResiduals(line, tube_radius = 0.15)
-  residuals_runner = LPCResidualsRunner(lpc.getCurve(), residuals_calc)
+  residuals_calc = LPCResiduals(tube_radius = 0.15)
+  residuals_calc.setDataPoints(line)
+  residuals_runner = LPCResidualsRunner(residuals_calc)
+  residuals_runner.setLpcCurves(lpc_curve.getCurve())
   analysis = lpcCurvePruner(residuals_runner)   
   a = array([[ 0.,          0.00058024,  0.00078112,  0.22710005,  0.22702893],
              [ 0.00063906,  0.,          0.00029174,  0.22873423,  0.2286578 ],
@@ -178,4 +219,5 @@ if __name__ == "__main__":
              [ 0.18029958,  0.18030112,  0.18029657,  0.00034616,  0.        ]])
   analysis._residuals = {'distance_matrix': a}
   rem_curves = analysis._calculateAbsoluteScaleDistanceMatrixCurves()      
+  '''
         

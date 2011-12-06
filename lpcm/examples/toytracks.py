@@ -5,7 +5,8 @@ Created on 22 Nov 2011
 '''
 from collections import defaultdict
 from itertools import cycle
-from lpcm.lpcAnalysis import lpcCurvePruner, lpcAnalysisPickleReader
+from lpcm.lpcAnalysis import lpcCurvePruner, lpcAnalysisPickleReader, \
+  LPCPurityCalculator
 from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
 from lpcm.lpcProcessing import LamuRead, lpcProcessor
 from mpl_toolkits.mplot3d import axes3d, Axes3D
@@ -70,24 +71,7 @@ def LPCEfficiencyCalculator(curves, data_range, particle_hits, tau):
   proton_efficiency = float(proton_coverage) / len(proton_hits)
   print 'residuals'
 
-def LPCPurityCalculator(curves, data_range, voxel_to_pdg_dictionary, tau):
-  hit_tuples = voxel_to_pdg_dictionary.keys()
-  if data_range is None:
-    data_range = 1.0
-  hits = array([[h[0], h[1], h[2]] for h in hit_tuples]) / data_range
-  residuals_calc = LPCResiduals(hits, tube_radius = 0.12)
-  residuals_runner = LPCResidualsRunner(curves, residuals_calc)
-  residuals_runner.setTauRange([tau])
-  residuals = residuals_runner.calculateResiduals(True, False, False)
-  pdg_code_frequencies = []
-  for i in range(len(curves)):
-    d = defaultdict(int)
-    hit_labels = [voxel_to_pdg_dictionary[hit_tuples[i]] for i in residuals['curve_residuals'][i]['coverage_indices'][tau]]
-    flattened_hit_labels = [pdg_code for pdg_code_list in hit_labels for pdg_code in pdg_code_list]
-    for pdg_code in flattened_hit_labels:
-      d[pdg_code] += 1
-    pdg_code_frequencies.append(d)
-  return pdg_code_frequencies
+
 
 def toyLPCCurveDump(rootfile, outfile):
   '''Moved to lpcProcessing.LpcPLPCBaseWriter and derived classes

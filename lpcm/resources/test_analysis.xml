@@ -15,8 +15,9 @@ element       tag	types
 ========================================
 Read		      lpcAnalysisPickleReader, lpcAnalysisShelveReader (SOON!)
 Residuals     lpcResidualsRunner
-Prune         lpcCurvePruner
+Pruner        lpcCurvePruner
 Serialization	(TODO!)
+Misc          misc (Misc is used to set some attributes that are not constructor arguments to type 'type'
 	
 Each 'par' element specifies a parameter that is passed to the constructor - element attribute 'name' is the constructor's argument 
 name, 'type' is its type, and 'value' is cast to type 'type' before being assigned to variable 'name' in the function call. Note 
@@ -25,7 +26,7 @@ escape characters apply to ampersands, quotation marks, ...
 -->
 <lpcAnalysis>
 	<Read type="lpcAnalysisPickleReader">
-		<par type="str" name="metadata_filename" value="/home/droythorne/git/physics/lpcm/lpcm/resources/muon-proton_blahblah_metadata.pkl"></par>
+		<par type="str" name="metadata_filename" value="../../resources/muon-proton_1266297863573875304_meta.pkl"></par>
 		<par type="int" name="max_events" value="2"></par>
 	</Read>
 	<Residuals type="LPCResiduals">
@@ -33,4 +34,11 @@ escape characters apply to ampersands, quotation marks, ...
 	   <par type="float" name="tube_radius" value="3.0"></par>
      <par type="float" name="eps" value="0.0"></par>           
   </Residuals>
+  <Pruner type="lpcCurvePruner">
+    <par type="float" name="closeness_threshold" value="5"></par>  
+    <par type="float" name="path_length_threshold" value="10"></par>
+  </Pruner>
+  <Misc type="misc">
+    <par type="str" name="output_filename" value="/tmp/purity_data.pkl"></par>
+  </Misc>
 </lpcAnalysis>

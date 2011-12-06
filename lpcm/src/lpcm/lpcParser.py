@@ -73,10 +73,8 @@ class lpcProcessingParser(lpcParameterParser):
    
 class lpcAnalysisParser(lpcParameterParser):  
   TYPE_TAG = 'lpcAnalysis'
-  
   def __init__(self, filename):
     lpcParameterParser.__init__(self, filename) 
-  
   def getReadParameters(self):
     '''Gets the filename of processing metadata file, type that reads it in and, if present, max number of 
     events to analyse (set as None if absent)
@@ -86,4 +84,10 @@ class lpcAnalysisParser(lpcParameterParser):
     return d
   def getResidualsParameters(self):
     d = self._generateParamDictionary('Residuals')
+    return d
+  def getPrunerParameters(self):
+    d = self._generateParamDictionary('Pruner')
+    return d
+  def getMiscParameters(self):
+    d = self._generateParamDictionary('Misc')
     return d
