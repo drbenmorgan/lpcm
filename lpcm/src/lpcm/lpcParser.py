@@ -17,7 +17,10 @@ class lpcParameterParser(object):
     '''
     self._filename = filename
     self._config_tree = ElementTree(file = filename)
-  
+  def _assignDictionaryItem(self, item_dict):
+    s = 'v=' + item_dict['type'] + '("' + item_dict['value'] + '")' 
+    exec(s) #TODO - remove exec, there are clearly better ways to do this!
+    return v
   def _generateParamDictionary(self, tag):
     '''Generates a dictionary containing 'type', a string defining the 'type' attribute of element 'tag'
     and 'params', a dictionary of parameters to be unpacked as arguments to constructors for instances of 'type'
@@ -31,9 +34,15 @@ class lpcParameterParser(object):
         params = {}
         for par in param_node[0]:  
           items = dict(par.items())
-          s = 'v=' + items['type'] + '("' + items['value'] + '")' 
-          exec(s) #TODO - remove exec, there are clearly better ways to do this!
-          params[items['name']] = v
+          if items['type'] == 'list':
+            elts = par.getiterator('elt')
+            temp_list = []
+            for e in elts:
+              list_attr = dict(e.items())
+              temp_list.append(self._assignDictionaryItem(list_attr))
+            params[items['name']] = temp_list
+          else:
+            params[items['name']] = self._assignDictionaryItem(items)
         return {'type': param_type, 'params': params}
       else:
         msg = 'The required unique lpc configuration element tag, ' + parser_type_tag + ' is missing or not unique from ' + self._filename

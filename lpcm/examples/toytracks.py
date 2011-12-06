@@ -1,5 +1,7 @@
 '''
 Created on 22 Nov 2011
+DEPRECATED - all the functionality of this file has now been farmed out to other modules with the exception of
+LPCEfficiencyCalculator, to move in due course
 
 @author: droythorne
 '''
@@ -14,6 +16,7 @@ from numpy.core.numeric import array
 import cPickle
 import matplotlib.pyplot as plt
 import sys
+
 
 class LamuEventAccessor():
   '''Moved to lpcProcessing.LamuEventDecorator

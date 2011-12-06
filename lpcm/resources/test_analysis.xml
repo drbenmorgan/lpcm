@@ -32,7 +32,10 @@ escape characters apply to ampersands, quotation marks, ...
 	<Residuals type="LPCResiduals">
 	   <par type="int" name="k" value="20"></par>
 	   <par type="float" name="tube_radius" value="3.0"></par>
-     <par type="float" name="eps" value="0.0"></par>           
+     <par type="float" name="eps" value="0.0"></par> 
+     <par type="list" name="tau_range">
+       <elt type="float" value="2.0"></elt>
+     </par>          
   </Residuals>
   <Pruner type="lpcCurvePruner">
     <par type="float" name="closeness_threshold" value="5"></par>  

@@ -156,9 +156,9 @@ class lpcAnalyser(object):
   def _initResiduals(self):
     residual_parameters = self._parser.getResidualsParameters()
     if residual_parameters['type'] == 'LPCResiduals':
+      tau_range = residual_parameters['params'].pop('tau_range')
       self._residuals = LPCResiduals(**residual_parameters['params'])
-      self._residuals_runner = LPCResidualsRunner(self._residuals)
-      self._residuals_runner.setTauRange([2.0]) #TODO - parameterise this in config file
+      self._residuals_runner = LPCResidualsRunner(self._residuals, tau_range)
     else:
       raise ValueError, 'Specified type of residuals calculator is not recognised'
   def _initPruner(self):

@@ -17,9 +17,9 @@ class LPCResidualsRunner():
   in cylinder m contained in cylinder n (i.e. the degree of overlap in the hits associated to each path, used later to prune the result set
   by removing or concatenating curves 
   '''
-  def __init__(self, lpc_residuals):
+  def __init__(self, lpc_residuals, tau_range):
     self._lpcResiduals = lpc_residuals
-    self._tauRange = None
+    self._tauRange = tau_range
     self._residuals = None
   
   def setLpcCurves(self, lpc_curves):
