@@ -24,7 +24,7 @@ pickles the output
 		<par type="bool" name="cross" value=""></par>
 		<par type="float" name="convergence_at" value="0.0001"></par>
 	</Lpc>	
-	<Serialization type="LPCPickler">
+	<Serialization type="LPCShelver">
 		<par type="str" name="target_directory" value="/tmp"></par>
 		<par type="str" name="target_filename_prefix" value="muon-proton"></par>
 	</Serialization>

@@ -4,14 +4,13 @@ Created on 25 Nov 2011
 @author: droythorne
 '''
 from collections import defaultdict
-from lpcm.lpc import LPCImpl
 from lpcm.lpcDiagnostics import LPCResiduals, LPCResidualsRunner
 from lpcm.lpcParser import lpcAnalysisParser
 from lpcm.lpcProcessing import LamuRead
 from numpy.core.numeric import array
-from numpy.ma.core import arange
 from scitools.PrmDictBase import PrmDictBase
 import cPickle
+import shelve
 
 class lpcAnalysisBaseReader(object):
   def __init__(self, metadata_filename, max_events):
@@ -23,7 +22,7 @@ class lpcAnalysisBaseReader(object):
     self.batch_parameters = cPickle.load(f)
     self.curves_filename = self.batch_parameters['lpc_filename']
     f.close()
-    self._f = open(self.curves_filename, 'rb')
+    
     self._truth = LamuRead(self.batch_parameters['reader_parameters']['filename'], self.batch_parameters['reader_parameters']['max_events'])
   def __del__(self):
     self._f.close()
@@ -32,8 +31,9 @@ class lpcAnalysisPickleReader(lpcAnalysisBaseReader):
   def __init__(self, metadata_filename, max_events = None):
     lpcAnalysisBaseReader.__init__(self, metadata_filename, max_events)
     self._truth_generator = self._truth.getEventGenerator()
+    self._f = open(self.curves_filename, 'rb')
   
-  def getEvent(self):
+  def getaNextEvent(self):
     '''Returns a tuple of (evt_curves, evt_truth), where evt_curves returns the next event from the pickled
     output of lpcProcessing, and evt_truth is a LamuEventDecorator object. The LamuEventDecorator will 
     contain the relevant truth data for the loaded pickled event, on the assumption that this object references
@@ -44,7 +44,38 @@ class lpcAnalysisPickleReader(lpcAnalysisBaseReader):
     return evt_curves, evt_truth
 
 class lpcAnalysisShelveReader(lpcAnalysisBaseReader):
-  pass
+  def __init__(self, metadata_filename, max_events = None):
+    lpcAnalysisBaseReader.__init__(self, metadata_filename, max_events)
+    self._truth_generator = self._truth.getEventGenerator()
+    self._evt_generator = self._eventGenerator()
+    self._f = shelve.open(self.curves_filename)
+    
+  def _eventGenerator(self):
+    '''Relies upon data having been shelved using LPCShelver (i.e. keys are indexed with integer strings from '0' to '<<num_events - 1>>'
+    whereby data read in sequence using self._truth_generator and self._evt_generator will correspond to the same event
+    '''  
+    i = -1
+    while 1:
+      i += 1
+      yield self._f[str(i)]
+  
+  def getNextEvent(self):
+    '''Gets tuples in sequence with zeroth element equal to a shelved lpcProcessing event and first element a LamuEventDecorator object
+    (mimics behavior of lpcAnalysisPickleReader) Once the number of calls exceed the number of shelved events, raises an EOF exception
+    (as pickled events would) so that lpcAnalyser can terminate processing loop
+    '''
+    try:
+      evt_curves = self._evt_generator.next()
+    except KeyError:
+      raise EOFError
+    evt_truth = self._truth_generator.next()
+    return evt_curves, evt_truth
+  
+  def getSingleEvent(self, evt_id):
+    '''Gets a specific event number'''
+    evt_truth = self._truth.getEvent(evt_id)
+    evt_curves = self._f[str(evt_id)]
+    return evt_curves, evt_truth
 
 class lpcCurvePruner(PrmDictBase):
     '''
@@ -178,7 +209,7 @@ class lpcAnalyser(object):
     out_data = []
     while 1:
       try:
-        evt = self._reader.getEvent()
+        evt = self._reader.getNextEvent()
         self._residuals.setDataPoints(evt[0]['Xi'])
         self._residuals_runner.setLpcCurves(evt[0]['lpc_curve'])
         self._residuals_runner.calculateResiduals(calc_residuals = False, calc_containment_matrix = False)

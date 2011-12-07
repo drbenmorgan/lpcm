@@ -35,6 +35,7 @@ escape characters apply to ampersands, quotation marks, ...
      <par type="float" name="eps" value="0.0"></par> 
      <par type="list" name="tau_range">
        <elt type="float" value="2.0"></elt>
+       <elt type="float" value="3.0"></elt>
      </par>          
   </Residuals>
   <Pruner type="lpcCurvePruner">
