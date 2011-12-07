@@ -33,7 +33,7 @@ class lpcAnalysisPickleReader(lpcAnalysisBaseReader):
     self._truth_generator = self._truth.getEventGenerator()
     self._f = open(self.curves_filename, 'rb')
   
-  def getaNextEvent(self):
+  def getNextEvent(self):
     '''Returns a tuple of (evt_curves, evt_truth), where evt_curves returns the next event from the pickled
     output of lpcProcessing, and evt_truth is a LamuEventDecorator object. The LamuEventDecorator will 
     contain the relevant truth data for the loaded pickled event, on the assumption that this object references
