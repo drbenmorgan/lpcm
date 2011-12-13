@@ -221,7 +221,7 @@ class lpcAnalyser(object):
         out_data.append({'voxel_dict': voxel_to_pdg_dictionary, 'pur': pur})
       except EOFError:
         break
-      
+    #TODO - factor this out into a class which enters the analysis configuration file
     outfile = open(self._output_filename, 'w')
     cPickle.dump(out_data, outfile, -1)
 

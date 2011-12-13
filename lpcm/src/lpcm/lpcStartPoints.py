@@ -77,7 +77,7 @@ class lpcMeanShift(PrmDictBase):
     for k in range(len(labels_unique)):
       cluster_members = labels == k
       cluster_center = cluster_centers[k]
-      cluster = array(zip(self._Xi[cluster_members, 0], self._Xi[cluster_members, 1], self._Xi[cluster_members, 2]))
+      cluster = self._Xi[cluster_members,:]
       mean_sub = cluster - cluster_center 
       cov_x = dot(transpose(mean_sub), mean_sub) 
       eigen_cov = eigh(cov_x)

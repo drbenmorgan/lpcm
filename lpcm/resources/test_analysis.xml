@@ -13,7 +13,7 @@ Available type are...
 
 element       tag	types
 ========================================
-Read		      lpcAnalysisPickleReader, lpcAnalysisShelveReader (SOON!)
+Read		      lpcAnalysisPickleReader, lpcAnalysisShelveReader
 Residuals     lpcResidualsRunner
 Pruner        lpcCurvePruner
 Serialization	(TODO!)

@@ -1,3 +1,28 @@
+'''
+Usage only as a macro as follows:
+
+
+import lpcm.lpcm_eff_pur_20111129
+
+#read in the output from an lpcAnalysis run and calcualte the efficiencies and purities based on individual particle ids
+#and the combination of pdg codes 2212 and 13 (proton and muon), pureff is a list (indexed by event number) of dictionaries, with 
+#keys 'epr' ('binary' efficiency/purity which groups pdg codes in 'particles' argument to runEfficiencyPurity) and 'ep' (which
+#gives efficiency/purity for each particle individually). The values of each of these keys are dictionaries with keys corresponding
+#the tau parameters given to lpcAnalysis (tau is the radius of segment-wise cylinders around a track use to associate a hit with
+#the given track). Each value is a dictionary with keys 'pur', the purity* for each particle or group of particles (+1 for particles
+#in 'particles' argument, -1 for the other particles); 'eff' the efficiency (what proportion of all particles in the event of a 
+#given type are within tau of a constructed lpc curve) 
+# *purity for a particular particle, p,  is defined as the the proportion of particle p hits (p-hits) of all hits within tau 
+#of the curve that has the largest number of p-hits within tau. For voxels that contain hits from multiple particles, every particle
+#counts towards purity and efficiency (i.e. in the proton purity calculation, voxels with, say, a proton AND electron hit will count twice (once for each particle) 
+#in the denominator and only once in the numerator; for the proton efficiency, the proton hit will be included in numerator and denominator; 
+#so it might be said that purity is incomplete in that it only picks out the curve with the most associated hits, but pessimistic
+#in that it counts multi-particle voxel hits as impurities, so that simultaneous 100% efficiency and 100% purity is impossible 
+ 
+pureff = pe.runEfficiencyPurity('/home/droythorne/git/physics/lpcm/lpcm/resources/purity_data.pkl', [2212,13])
+pureff[0]['epr']
+'''
+
 import cPickle
 from collections import defaultdict
 import ROOT as rt
@@ -81,8 +106,8 @@ def calcEfficiencyPurity(evt):
         try:
           hits = lpc_coverage[tau][i][p] 
           if hits > p_max_hits:
-  	         p_max_hits = hits
-  	         p_max_hits_idx = i
+            p_max_hits = hits
+            p_max_hits_idx = i
           p_sum_hits_in_curves += hits
         except KeyError:
           pass
@@ -94,23 +119,3 @@ def calcEfficiencyPurity(evt):
     eff_pur = {'eff':evt_eff, 'pur': evt_pur, 'num_curves': len(lpc_coverage[tau])}
     eff_pur_dict[tau] = eff_pur
   return eff_pur_dict
-'''
-import lpcm.lpcm_eff_pur_20111129
-
-#read in the output from an lpcAnalysis run and calcualte the efficiencies and purities based on individual particle ids
-#and the combination of pdg codes 2212 and 13 (proton and muon), pureff is a list (indexed by event number) of dictionaries, with 
-#keys 'epr' ('binary' efficiency/purity which groups pdg codes in 'particles' argument to runEfficiencyPurity) and 'ep' (which
-#gives efficiency/purity for each particle individually). The values of each of these keys are dictionaries with keys corresponding
-#the tau parameters given to lpcAnalysis (tau is the radius of segment-wise cylinders around a track use to associate a hit with
-#the given track). Each value is a dictionary with keys 'pur', the purity* for each particle or group of particles (+1 for particles
-#in 'particles' argument, -1 for the other particles); 'eff' the efficiency (what proportion of all particles in the event of a 
-#given type are within tau of a constructed lpc curve) 
-# *purity for a particular particle, p,  is defined as the the proportion of particle p hits (p-hits) of all hits within tau 
-#of the curve that has the largest number of p-hits within tau. For voxels that contain hits from multiple particles, every particle
-#counts towards purity and efficiency (i.e. in the proton purity calculation, voxels with, say, a proton AND electron hit will count twice (once for each particle) 
-#in the denominator and only once in the numerator; for the proton efficiency, the proton hit will be included in numerator and denominator; 
-#so it might be said that purity is incomplete in that it only picks out the curve with the most associated hits, but pessimistic
-#in that it counts multi-particle voxel hits as impurities, so that simultaneous 100% efficiency and 100% purity is impossible 
- 
-pureff = pe.runEfficiencyPurity('/home/droythorne/git/physics/lpcm/lpcm/resources/purity_data.pkl', [2212,13])
-pureff[0]['epr']

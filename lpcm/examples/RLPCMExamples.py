@@ -21,7 +21,7 @@ def readData(filename):
   return x
 
 def calSpeedFlow():
-  calspeedflow = array(readData('../../resources/calspeedflow.dat'))
+  calspeedflow = array(readData('../resources/calspeedflow.dat'))
   print calspeedflow
   lpc = LPCImpl(start_points_generator = lpcMeanShift(ms_h = 0.1), mult = 1)
   lpc.lpc(X = calspeedflow)
@@ -33,7 +33,7 @@ def calSpeedFlow():
   
   
 def gaia():
-  gaia = array(readData('../../resources/gaia.dat'))
+  gaia = array(readData('../resources/gaia.dat'))
   lpc = LPCImpl(start_points_generator = lpcMeanShift(), mult = 1, scaled = False)
   curve = lpc.lpc(X = gaia)
   fig = plt.figure()
